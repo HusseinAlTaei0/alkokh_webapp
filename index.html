@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="نظام إدارة الحلاقة والتحميم — عيادة الكوخ البيطرية">
+  <meta name="theme-color" content="#C026D3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>الكوخ البيطرية — الحلاقة والتحميم</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <!-- Animated Background -->
+  <div id="animated-bg" class="animated-bg"></div>
+
+  <!-- Navigation -->
+  <nav id="main-nav" class="nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <img src="assets/logo.svg" alt="الكوخ" class="nav-logo">
+        <span class="nav-title">الكوخ</span>
+      </div>
+      <div class="nav-actions">
+        <button id="logout-btn" class="logout-btn" style="display:none;" title="تسجيل الخروج">
+          <span class="logout-icon">🚪</span>
+          <span class="logout-text">خروج</span>
+        </button>
+        <button id="menu-toggle" class="menu-toggle-btn">
+          <span class="menu-text">القائمة</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Fullscreen Menu Overlay -->
+  <div id="fullscreen-menu" class="fullscreen-menu">
+    <div class="menu-content">
+      <a href="#booking" class="menu-link" data-view="booking">
+        <span class="menu-number">01</span>
+        <span class="menu-text">حجز الخدمة</span>
+      </a>
+      <a href="#employee" class="menu-link" data-view="employee">
+        <span class="menu-number">02</span>
+        <span class="menu-text">صفحة الموظف</span>
+      </a>
+      <a href="#operator" class="menu-link" data-view="operator">
+        <span class="menu-number">03</span>
+        <span class="menu-text">المنظم</span>
+        <span class="menu-lock">🔒</span>
+      </a>
+      <a href="#dashboard" class="menu-link" data-view="dashboard">
+        <span class="menu-number">04</span>
+        <span class="menu-text">التقارير</span>
+        <span class="menu-lock">🔒</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- App Container -->
+  <main id="app" class="app-container">
+    <!-- Views injected by JS -->
+  </main>
+
+  <!-- Toast notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Sound for notifications -->
+  <audio id="notification-sound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Jj4+LhoJ9eXd3eXyBhYmNj42KhoJ+fHp5eXyAhImNj46LhoJ9end4eHuAhImOj4+LiIN+fHt6fH+DhomMjIqHg398e3p7f4OHioyNjIiEgH58fH1/goaJi4yLiISAfn18fYCDh4qMjIuIhIB+fXx9gIOHiouMi4iEgH58fH2Ag4eKi4yLiISBf359fYCDh4mLi4qHg4B+fX19gIKGiYuLioeDgH5+fn+BhIeJiomHhIGAfn5+gIKFh4mJiIaCgH9+fn+BhIaIiYmHhIKAf35/gIKEhoeIh4WCgH9+f4CCg4WHh4aFg4GAfn5/gIGDhYaHhoSDgYB/f3+AgYOFhoeGhIOBgH9/f4CBg4WHhoWDgYB/f3+AgYOFhoaFg4GAf39/gIGDhYaGhYOBgH9/f4CBg4WHhoWDgYB/f4CAgYOFhoaFg4GAf39/gIGDhIaFhIOBgH9/gICBg4SEhYSDAICAgH+AgIGCg4SEBIKEAICAAIA=" type="audio/wav">
+  </audio>
+
+  <!-- Scripts: config first, then app logic -->
+  <script src="config.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

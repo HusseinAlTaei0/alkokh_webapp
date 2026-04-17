@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" fill="none">
+  <!-- House roof -->
+  <path d="M100 8 L185 75 L175 75 L100 18 L25 75 L15 75 Z" fill="#D946EF" opacity="0.5"/>
+  <!-- House body -->
+  <rect x="35" y="65" width="130" height="115" rx="16" fill="#C026D3"/>
+  <!-- Paw heart -->
+  <path d="M100 155 C100 155 70 130 70 115 C70 105 78 98 88 98 C93 98 97 100 100 104 C103 100 107 98 112 98 C122 98 130 105 130 115 C130 130 100 155 100 155Z" fill="white"/>
+  <!-- Paw pads -->
+  <ellipse cx="75" cy="92" rx="11" ry="13" fill="white"/>
+  <ellipse cx="125" cy="92" rx="11" ry="13" fill="white"/>
+  <ellipse cx="93" cy="78" rx="9" ry="11" fill="white"/>
+  <ellipse cx="107" cy="78" rx="9" ry="11" fill="white"/>
+</svg>
