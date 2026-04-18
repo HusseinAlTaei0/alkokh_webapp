@@ -145,7 +145,7 @@ const DB = {
 
   async addOrder(order) {
     try {
-      const { error } = await supabaseClient
+      const { data, error } = await supabaseClient
         .from('orders')
         .insert({
           customer_name: order.customer_name,
@@ -155,7 +155,9 @@ const DB = {
           service_id: order.service_id,
           notes: order.notes || '',
           status: 'waiting'
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
@@ -170,7 +172,7 @@ const DB = {
         console.warn('Customer upsert failed:', e);
       }
 
-      return true;
+      return data?.id || true;
     } catch (err) {
       console.error('Error adding order:', err);
       throw err;
@@ -268,6 +270,71 @@ const DB = {
       return true;
     } catch (err) {
       console.error('Error deleting all orders:', err);
+      return false;
+    }
+  },
+
+  // --- Notification Logs ---
+  async getNotificationStats() {
+    try {
+      const { data, error } = await supabaseClient
+        .from('notification_logs')
+        .select('status');
+      if (error) throw error;
+      const stats = { success: 0, failed: 0, pending: 0 };
+      (data || []).forEach(r => {
+        if (stats[r.status] !== undefined) stats[r.status]++;
+      });
+      return stats;
+    } catch (err) {
+      console.error('getNotificationStats error:', err);
+      return { success: 0, failed: 0, pending: 0 };
+    }
+  },
+
+  async getRecentNotificationLogs(limit = 20, filter = 'all') {
+    try {
+      let q = supabaseClient
+        .from('notification_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (filter && filter !== 'all') q = q.eq('status', filter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('getRecentNotificationLogs error:', err);
+      return [];
+    }
+  },
+
+  async resendNotification(logId) {
+    try {
+      // Fetch original log
+      const { data: log, error: fetchErr } = await supabaseClient
+        .from('notification_logs')
+        .select('*')
+        .eq('id', logId)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if (!log) return false;
+
+      // Invoke edge function with a fresh log row (not reusing old one)
+      const { data, error } = await supabaseClient.functions.invoke('send-whatsapp', {
+        body: {
+          order_id: log.order_id,
+          event_type: log.event_type,
+          phone: log.phone,
+          customer_name: log.customer_name,
+          pet_name: log.pet_name,
+          service_name: log.service_name
+        }
+      });
+      if (error) throw error;
+      return data?.success === true;
+    } catch (err) {
+      console.error('resendNotification error:', err);
       return false;
     }
   },
@@ -520,82 +587,99 @@ function showLoading(container) {
 
 // ==========================================
 // WHATSAPP MESSAGING MODULE
-// يستخدم JT-BOT Webhook كطريقة أساسية للإرسال
+// يستخدم Supabase Edge Function (send-whatsapp) التي:
+//  - ترسل عبر JT-BOT webhook
+//  - تسجل كل محاولة في notification_logs
+//  - تعيد المحاولة حتى 3 مرات مع backoff
 // ==========================================
 const WhatsApp = {
   _enabled: true,
 
-  // إرسال عبر JT-BOT Webhook (الطريقة الأساسية)
-  async sendViaWebhook(phone, customerName, serviceName, petName, eventType) {
-    if (!this._enabled || !phone) return false;
+  // الإرسال عبر Edge Function (تسجيل + retry تلقائياً)
+  async sendViaEdgeFunction({ phone, customerName, serviceName, petName, eventType, orderId = null }) {
+    if (!this._enabled || !phone) return { success: false, error: 'disabled_or_no_phone' };
 
     try {
-      const res = await fetch('/api/whatsapp/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabaseClient.functions.invoke('send-whatsapp', {
+        body: {
+          order_id: orderId,
+          event_type: eventType || 'booking_confirmation',
           phone: phone,
           customer_name: customerName || '',
           service_name: serviceName || '',
-          pet_name: petName || '',
-          event_type: eventType || 'booking_confirmation'
-        })
+          pet_name: petName || ''
+        }
       });
 
-      const data = await res.json();
+      if (error) {
+        console.warn(`⚠️ Edge function invoke error [${eventType}]:`, error.message || error);
+        // fire a UI toast for visibility (admin/operator only — harmless for customers)
+        try { showToast && showToast(`⚠️ فشل إرسال واتساب: ${error.message || 'خطأ'}`, 'warning'); } catch {}
+        return { success: false, error: error.message || String(error) };
+      }
 
-      if (data.success) {
-        console.log(`✅ WhatsApp notification sent via JT-BOT [${eventType}]`);
-        return true;
+      if (data && data.success) {
+        console.log(`✅ WhatsApp sent via edge function [${eventType}] log=${data.log_id}`);
+        return { success: true, log_id: data.log_id };
       } else {
-        console.warn(`⚠️ JT-BOT webhook failed:`, data.error);
-        return false;
+        console.warn(`⚠️ WhatsApp send failed [${eventType}]:`, data?.error);
+        try { showToast && showToast(`⚠️ لم تُرسل رسالة الواتساب (${eventType})`, 'warning'); } catch {}
+        return { success: false, error: data?.error, log_id: data?.log_id };
       }
     } catch (err) {
-      console.warn('JT-BOT webhook error (non-blocking):', err.message);
-      return false;
+      console.warn(`WhatsApp edge function exception [${eventType}]:`, err.message);
+      return { success: false, error: err.message };
     }
   },
 
-  // إرسال نص مباشر عبر Meta Cloud API (احتياطي)
-  async send(phone, message) {
-    if (!this._enabled || !phone) return false;
-
-    try {
-      const res = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: phone, type: 'text', message })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        console.log('✅ WhatsApp message sent (Cloud API)');
-        return true;
-      } else {
-        console.warn('⚠️ WhatsApp Cloud API send failed:', data.error);
-        return false;
-      }
-    } catch (err) {
-      console.warn('WhatsApp Cloud API error (non-blocking):', err.message);
-      return false;
-    }
-  },
-
-  async sendBookingConfirmation(phone, customerName, petName, serviceNameAr) {
+  async sendBookingConfirmation(phone, customerName, petName, serviceNameAr, orderId = null) {
     console.log('📤 Sending booking confirmation to:', phone);
-    return this.sendViaWebhook(phone, customerName, serviceNameAr, petName, 'booking_confirmation');
+    return this.sendViaEdgeFunction({
+      phone, customerName, serviceName: serviceNameAr, petName,
+      eventType: 'booking_confirmation', orderId
+    });
   },
 
-  async sendTaskStarted(phone, customerName, petName, serviceNameAr, employeeName) {
+  async sendTaskStarted(phone, customerName, petName, serviceNameAr, employeeName, orderId = null) {
     console.log('📤 Sending task started notification to:', phone);
-    return this.sendViaWebhook(phone, customerName, serviceNameAr, petName, 'task_started');
+    return this.sendViaEdgeFunction({
+      phone, customerName, serviceName: serviceNameAr, petName,
+      eventType: 'task_started', orderId
+    });
   },
 
-  async sendTaskCompleted(phone, customerName, petName, serviceNameAr, durationMinutes) {
+  async sendTaskCompleted(phone, customerName, petName, serviceNameAr, durationMinutes, orderId = null) {
     console.log('📤 Sending task completed notification to:', phone);
-    return this.sendViaWebhook(phone, customerName, serviceNameAr, petName, 'task_completed');
+    return this.sendViaEdgeFunction({
+      phone, customerName, serviceName: serviceNameAr, petName,
+      eventType: 'task_completed', orderId
+    });
+  },
+
+  // جدولة رسالة feedback بعد X دقيقة من الإكمال
+  async scheduleFeedbackRequest({ phone, customerName, petName, serviceNameAr, orderId, delayMinutes = 60 }) {
+    if (!phone) return false;
+    try {
+      const scheduledAt = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+      const { error } = await supabaseClient.from('pending_notifications').insert({
+        order_id: orderId || null,
+        event_type: 'feedback_request',
+        phone,
+        customer_name: customerName || '',
+        pet_name: petName || '',
+        service_name: serviceNameAr || '',
+        scheduled_at: scheduledAt
+      });
+      if (error) {
+        console.warn('Failed to schedule feedback:', error.message);
+        return false;
+      }
+      console.log(`⏰ Feedback scheduled for ${phone} at ${scheduledAt}`);
+      return true;
+    } catch (err) {
+      console.warn('scheduleFeedbackRequest error:', err.message);
+      return false;
+    }
   }
 };
 
@@ -1077,7 +1161,7 @@ const BookingView = {
       submitBtn.disabled = true;
 
       try {
-        await DB.addOrder({
+        const newOrderId = await DB.addOrder({
           customer_name: customerName,
           customer_phone: customerPhone || null,
           pet_name: petName,
@@ -1086,10 +1170,13 @@ const BookingView = {
           notes: notes || ''
         });
 
-        // Send WhatsApp booking confirmation (non-blocking)
+        // Send WhatsApp booking confirmation (non-blocking, logged via edge function)
         if (customerPhone) {
           const service = this._services.find(s => s.id === this.selectedServiceId);
-          WhatsApp.sendBookingConfirmation(customerPhone, customerName, petName, service?.type_ar || '').catch(() => {});
+          WhatsApp.sendBookingConfirmation(
+            customerPhone, customerName, petName, service?.type_ar || '',
+            typeof newOrderId === 'string' ? newOrderId : null
+          ).catch(() => {});
         }
 
         playNotificationSound();
@@ -1885,7 +1972,7 @@ const EmployeeView = {
           showToast('✅ تم قبول المهمة — ابدأ العمل الآن!', 'success');
           playNotificationSound();
 
-          // Send WhatsApp "task started" notification (non-blocking)
+          // Send WhatsApp "task started" notification (non-blocking, logged via edge function)
           try {
             const orders = await DB.getEmployeeOrders(this._employee.id);
             const order = orders.find(o => o.id === orderId);
@@ -1897,7 +1984,8 @@ const EmployeeView = {
                 order.customer_name,
                 order.pet_name,
                 service?.type_ar || '',
-                this._employee.name_ar
+                this._employee.name_ar,
+                orderId
               ).catch(() => {});
             }
           } catch (e) { /* non-blocking */ }
@@ -1937,9 +2025,18 @@ const EmployeeView = {
           showToast(`🏁 أحسنت! تم الإنجاز بنجاح (${duration} دقيقة)`, 'success');
           playNotificationSound();
 
-          // Send WhatsApp "task completed" notification (non-blocking)
+          // Send WhatsApp "task completed" notification (non-blocking, logged)
           if (orderPhone) {
-            WhatsApp.sendTaskCompleted(orderPhone, orderCustomer, orderPet, orderServiceAr, duration).catch(() => {});
+            WhatsApp.sendTaskCompleted(orderPhone, orderCustomer, orderPet, orderServiceAr, duration, orderId).catch(() => {});
+            // Schedule feedback request 1 hour later (handled by pg_cron + edge function)
+            WhatsApp.scheduleFeedbackRequest({
+              phone: orderPhone,
+              customerName: orderCustomer,
+              petName: orderPet,
+              serviceNameAr: orderServiceAr,
+              orderId,
+              delayMinutes: 60
+            }).catch(() => {});
           }
         } else {
           showToast('❌ حدث خطأ، حاول مرة أخرى', 'error');
@@ -2117,6 +2214,86 @@ const DashboardView = {
 
     html += `</div></div>`;
 
+    // WhatsApp notification logs section
+    const notifStats = await DB.getNotificationStats();
+    const recentLogs = await DB.getRecentNotificationLogs(20, this._logsFilter || 'all');
+    html += `
+      <div class="section-divider"></div>
+      <div class="chart-card animate-in-delay-3">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div class="chart-title" style="margin:0;">📱 سجل رسائل الواتساب</div>
+          <div style="display:flex; gap:8px;">
+            <span class="badge badge-success">نجح: ${notifStats.success}</span>
+            <span class="badge badge-danger">فشل: ${notifStats.failed}</span>
+            <span class="badge badge-warning">قيد الإرسال: ${notifStats.pending}</span>
+          </div>
+        </div>
+
+        <div class="tab-filter" style="margin-bottom:14px;">
+          <button class="tab-filter-btn ${(this._logsFilter||'all')==='all'?'active':''}" data-logs-filter="all">الكل</button>
+          <button class="tab-filter-btn ${this._logsFilter==='success'?'active':''}" data-logs-filter="success">ناجحة</button>
+          <button class="tab-filter-btn ${this._logsFilter==='failed'?'active':''}" data-logs-filter="failed">فاشلة</button>
+          <button class="tab-filter-btn ${this._logsFilter==='pending'?'active':''}" data-logs-filter="pending">قيد الإرسال</button>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="notif-logs-table" style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+            <thead>
+              <tr style="background:rgba(0,0,0,0.04);">
+                <th style="padding:8px; text-align:right;">الوقت</th>
+                <th style="padding:8px; text-align:right;">الزبون</th>
+                <th style="padding:8px; text-align:right;">الرقم</th>
+                <th style="padding:8px; text-align:right;">النوع</th>
+                <th style="padding:8px; text-align:right;">الحالة</th>
+                <th style="padding:8px; text-align:right;">المحاولات</th>
+                <th style="padding:8px; text-align:right;">الخطأ</th>
+                <th style="padding:8px; text-align:right;">إجراء</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+    if (recentLogs.length === 0) {
+      html += `<tr><td colspan="8" style="padding:16px; text-align:center; opacity:0.6;">لا توجد سجلات حالياً</td></tr>`;
+    } else {
+      const eventLabels = {
+        booking_confirmation: '✅ حجز',
+        task_started: '🚀 بدء العمل',
+        task_completed: '🏁 إكمال',
+        feedback_request: '⭐ تقييم'
+      };
+      const statusLabels = {
+        success: '<span style="color:#10b981;">✅ نجح</span>',
+        failed: '<span style="color:#ef4444;">❌ فشل</span>',
+        pending: '<span style="color:#f59e0b;">⏳ قيد الإرسال</span>'
+      };
+      recentLogs.forEach(log => {
+        const dt = new Date(log.created_at).toLocaleString('ar-IQ', { hour12: false });
+        const errShort = (log.error_message || '').substring(0, 60);
+        html += `
+          <tr style="border-bottom:1px solid rgba(0,0,0,0.06);">
+            <td style="padding:8px; white-space:nowrap;">${dt}</td>
+            <td style="padding:8px;">${log.customer_name || '-'}</td>
+            <td style="padding:8px; direction:ltr; text-align:right;">${log.phone}</td>
+            <td style="padding:8px;">${eventLabels[log.event_type] || log.event_type}</td>
+            <td style="padding:8px;">${statusLabels[log.status] || log.status}</td>
+            <td style="padding:8px; text-align:center;">${log.attempt_count || 0}</td>
+            <td style="padding:8px; font-size:0.78rem; color:#666; max-width:200px;">${errShort}${errShort.length >= 60 ? '…' : ''}</td>
+            <td style="padding:8px;">
+              ${log.status === 'failed' ? `<button class="btn btn-sm" data-resend-log="${log.id}">↻ إعادة</button>` : ''}
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
     // Reminder templates section
     html += `
       <div class="section-divider"></div>
@@ -2153,10 +2330,36 @@ const DashboardView = {
 
     container.innerHTML = html;
 
-    // Bind period filter
-    container.querySelectorAll('.tab-filter-btn').forEach(btn => {
+    // Bind period filter (only top filter, not logs filter)
+    container.querySelectorAll('.tab-filter-btn[data-period]').forEach(btn => {
       btn.addEventListener('click', async () => {
         this.period = btn.dataset.period;
+        showLoading($('#app'));
+        await this._buildUI($('#app'));
+      });
+    });
+
+    // Bind logs filter
+    container.querySelectorAll('[data-logs-filter]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        this._logsFilter = btn.dataset.logsFilter;
+        showLoading($('#app'));
+        await this._buildUI($('#app'));
+      });
+    });
+
+    // Bind resend buttons
+    container.querySelectorAll('[data-resend-log]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const logId = btn.dataset.resendLog;
+        btn.disabled = true;
+        btn.textContent = '⏳';
+        const ok = await DB.resendNotification(logId);
+        if (ok) {
+          showToast('✅ تم إعادة الإرسال', 'success');
+        } else {
+          showToast('❌ فشل إعادة الإرسال', 'error');
+        }
         showLoading($('#app'));
         await this._buildUI($('#app'));
       });
