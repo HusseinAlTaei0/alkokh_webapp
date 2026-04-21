@@ -1183,7 +1183,15 @@ const SYMPTOMS = [
 ];
 const SYMPTOM_LABEL = SYMPTOMS.reduce((acc, s) => { acc[s.key] = s.label; return acc; }, {});
 
-const ANIMAL_TYPES = ['قطة', 'كلب', 'طائر', 'أرنب', 'هامستر', 'زواحف', 'حيوان آخر'];
+const ANIMAL_TYPES = [
+  { value: 'قطة',         icon: '🐱' },
+  { value: 'كلب',         icon: '🐶' },
+  { value: 'طائر',        icon: '🐦' },
+  { value: 'أرنب',        icon: '🐰' },
+  { value: 'هامستر',      icon: '🐹' },
+  { value: 'زواحف',       icon: '🦎' },
+  { value: 'حيوان آخر',   icon: '🐾' },
+];
 
 // Realtime subscriptions manager
 const Realtime = {
@@ -3470,13 +3478,6 @@ const MedicalIntakeView = {
               <input type="text" name="area" placeholder="مثال: الكرادة">
             </label>
             <label class="form-field">
-              <span>نوع الحيوان <em>*</em></span>
-              <select name="animal_type" required>
-                <option value="">اختر نوع الحيوان</option>
-                ${ANIMAL_TYPES.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('')}
-              </select>
-            </label>
-            <label class="form-field">
               <span>عمر الحيوان</span>
               <input type="text" name="animal_age" placeholder="مثال: سنتين أو 6 أشهر">
             </label>
@@ -3487,13 +3488,29 @@ const MedicalIntakeView = {
           </div>
 
           <div class="form-section">
+            <label class="form-label">نوع الحيوان <em>*</em></label>
+            <input type="hidden" name="animal_type" id="animal_type_hidden" required>
+            <div class="animal-type-grid">
+              ${ANIMAL_TYPES.map(t => `
+                <button type="button" class="animal-type-btn" data-value="${escHtml(t.value)}">
+                  <span class="animal-icon">${t.icon}</span>
+                  <span class="animal-label">${escHtml(t.value)}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="form-section">
             <label class="form-label">الأعراض (اختر ما ينطبق)</label>
-            <div class="symptom-grid">
+            <div class="symptom-list">
               ${SYMPTOMS.map(s => `
-                <label class="symptom-chip" data-key="${s.key}">
-                  <input type="checkbox" value="${s.key}">
-                  <span class="symptom-icon">${s.icon}</span>
-                  <span class="symptom-label">${s.label}</span>
+                <label class="symptom-row" data-key="${s.key}">
+                  <span class="symptom-check">
+                    <input type="checkbox" value="${s.key}" class="symptom-cb">
+                    <span class="symptom-checkmark"></span>
+                  </span>
+                  <span class="symptom-icon-sm">${s.icon}</span>
+                  <span class="symptom-text">${s.label}</span>
                 </label>
               `).join('')}
             </div>
@@ -3515,14 +3532,22 @@ const MedicalIntakeView = {
     `;
 
     const form = $('#intake-form');
-    const chips = $$('.symptom-chip');
-    chips.forEach(chip => {
-      chip.addEventListener('click', (e) => {
-        if (e.target.tagName !== 'INPUT') {
-          const cb = chip.querySelector('input');
-          cb.checked = !cb.checked;
-        }
-        chip.classList.toggle('active', chip.querySelector('input').checked);
+
+    // --- Animal type picker ---
+    const animalHidden = form.querySelector('#animal_type_hidden');
+    form.querySelectorAll('.animal-type-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        form.querySelectorAll('.animal-type-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        animalHidden.value = btn.dataset.value;
+      });
+    });
+
+    // --- Symptom checkboxes ---
+    // <label> auto-toggles the checkbox on click, so only listen to change
+    form.querySelectorAll('.symptom-row').forEach(row => {
+      row.querySelector('.symptom-cb').addEventListener('change', function () {
+        row.classList.toggle('active', this.checked);
       });
     });
 
@@ -3543,7 +3568,12 @@ const MedicalIntakeView = {
         const p = profile.patients[0];
         const lv = profile.lastVisit;
         if (p) {
-          setIfEmpty('animal_type', p.animal_type);
+          // Animal type: set hidden input + visually select the matching button
+          if (p.animal_type && !animalHidden.value) {
+            animalHidden.value = p.animal_type;
+            const match = form.querySelector(`.animal-type-btn[data-value="${p.animal_type}"]`);
+            if (match) match.classList.add('selected');
+          }
           setIfEmpty('pet_name', p.name);
         }
         if (lv) {
@@ -3575,7 +3605,7 @@ const MedicalIntakeView = {
         showToast('يرجى تعبئة الحقول المطلوبة', 'warning');
         return;
       }
-      const symptoms = Array.from(form.querySelectorAll('.symptom-chip input:checked')).map(i => i.value);
+      const symptoms = Array.from(form.querySelectorAll('.symptom-cb:checked')).map(i => i.value);
       const pet_name = String(fd.get('pet_name') || '').trim();
 
       const submitBtn = form.querySelector('.intake-submit');
