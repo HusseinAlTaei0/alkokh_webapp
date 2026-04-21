@@ -1677,80 +1677,85 @@ const BookingView = {
   _renderStep(container) {
     container.innerHTML = '';
 
-    if (this.step === 4) {
-      const content = document.createElement('div');
-      content.className = 'animate-in';
-      this._renderConfirmation(content);
-      container.appendChild(content);
-      return;
-    }
-
     // Header
-    container.insertAdjacentHTML('beforeend', `
-      <div class="booking-glass-header animate-in">
-        <a href="#home" class="back-link">← عودة</a>
-        <h1>✂️ الحلاقة والتحميم</h1>
-        <p>اختر الخدمة المناسبة لرفيقك</p>
-      </div>
-    `);
+    const header = document.createElement('div');
+    header.className = 'page-header animate-in';
+    header.innerHTML = `
+      <div class="brand-badge">🐾 عيادة الكوخ البيطرية</div>
+      <h1>حجز خدمة الحلاقة والتحميم</h1>
+      <p>اختر الخدمة المناسبة لرفيقك</p>
+    `;
+    container.appendChild(header);
 
     // Steps indicator
-    const labels = ['نوع الخدمة','تفاصيل الخدمة','المعلومات'];
-    container.insertAdjacentHTML('beforeend', `
-      <div class="bk-steps animate-in">
-        ${labels.map((lbl, i) => {
-          const n = i + 1;
-          const active = this.step === n;
-          const done   = this.step > n;
-          return `
-            <div class="bk-step ${active ? 'active' : ''} ${done ? 'done' : ''}">
-              <div class="bk-step-num">${done ? '✓' : n}</div>
-              <span class="bk-step-lbl">${lbl}</span>
-            </div>
-            ${n < 3 ? `<div class="bk-connector ${done ? 'done' : ''}"></div>` : ''}
-          `;
-        }).join('')}
+    const stepsHtml = `
+      <div class="booking-steps animate-in-delay-1">
+        <div class="step ${this.step >= 1 ? 'active' : ''} ${this.step > 1 ? 'completed' : ''}">
+          <div class="step-number">${this.step > 1 ? '✓' : '1'}</div>
+          <span class="step-label">نوع الخدمة</span>
+        </div>
+        <div class="step-connector ${this.step > 1 ? 'completed' : ''}"></div>
+        <div class="step ${this.step >= 2 ? 'active' : ''} ${this.step > 2 ? 'completed' : ''}">
+          <div class="step-number">${this.step > 2 ? '✓' : '2'}</div>
+          <span class="step-label">تفاصيل الخدمة</span>
+        </div>
+        <div class="step-connector ${this.step > 2 ? 'completed' : ''}"></div>
+        <div class="step ${this.step >= 3 ? 'active' : ''} ${this.step > 3 ? 'completed' : ''}">
+          <div class="step-number">${this.step > 3 ? '✓' : '3'}</div>
+          <span class="step-label">المعلومات</span>
+        </div>
       </div>
-    `);
+    `;
+    container.insertAdjacentHTML('beforeend', stepsHtml);
 
+    // Content based on step
     const content = document.createElement('div');
-    content.className = 'animate-in bk-content';
+    content.className = 'animate-in-delay-2';
+
     switch (this.step) {
-      case 1: this._renderCategorySelection(content); break;
-      case 2: this._renderTypeSelection(content); break;
-      case 3: this._renderInfoForm(content); break;
+      case 1:
+        this._renderCategorySelection(content);
+        break;
+      case 2:
+        this._renderTypeSelection(content);
+        break;
+      case 3:
+        this._renderInfoForm(content);
+        break;
+      case 4:
+        this._renderConfirmation(content);
+        break;
     }
+
     container.appendChild(content);
   },
 
   _renderCategorySelection(el) {
     el.innerHTML = `
-      <div class="bk-category-grid">
-        <button class="bk-cat-card" data-category="cat_grooming">
-          <div class="bk-cat-glow"></div>
-          <img src="assets/alkokh_icons/cat.png" alt="قطة" class="bk-cat-img">
-          <div class="bk-cat-title">حلاقة قطة</div>
-          <div class="bk-cat-sub">قصات متنوعة للقطط</div>
-        </button>
-        <button class="bk-cat-card" data-category="dog_grooming">
-          <div class="bk-cat-glow"></div>
-          <img src="assets/alkokh_icons/dog.png" alt="كلب" class="bk-cat-img">
-          <div class="bk-cat-title">حلاقة كلب</div>
-          <div class="bk-cat-sub">قصات متنوعة للكلاب</div>
-        </button>
-        <button class="bk-cat-card" data-category="bath">
-          <div class="bk-cat-glow"></div>
-          <img src="assets/alkokh_icons/bath.png" alt="تحميم" class="bk-cat-img">
-          <div class="bk-cat-title">تحميم</div>
-          <div class="bk-cat-sub">تحميم اعتيادي أو طبي</div>
-        </button>
+      <div class="service-grid">
+        <div class="service-card" data-category="cat_grooming" id="svc-cat">
+          <span class="emoji"><img src="assets/alkokh_icons/cat.png" alt="قطة"></span>
+          <div class="title">حلاقة قطة</div>
+          <div class="subtitle">قصات متنوعة للقطط</div>
+        </div>
+        <div class="service-card" data-category="dog_grooming" id="svc-dog">
+          <span class="emoji"><img src="assets/alkokh_icons/dog.png" alt="كلب"></span>
+          <div class="title">حلاقة الكلب</div>
+          <div class="subtitle">قصات متنوعة للكلاب</div>
+        </div>
+        <div class="service-card" data-category="bath" id="svc-bath">
+          <span class="emoji"><img src="assets/alkokh_icons/bath.png" alt="تحميم"></span>
+          <div class="title">تحميم</div>
+          <div class="subtitle">تحميم اعتيادي أو طبي</div>
+        </div>
       </div>
     `;
-    el.querySelectorAll('.bk-cat-card').forEach(card => {
+
+    el.querySelectorAll('.service-card').forEach(card => {
       card.addEventListener('click', () => {
         this.selectedCategory = card.dataset.category;
-        this.petType = card.dataset.category === 'cat_grooming' ? 'cat'
-                     : card.dataset.category === 'dog_grooming' ? 'dog' : null;
+        this.petType = card.dataset.category === 'cat_grooming' ? 'cat' :
+                       card.dataset.category === 'dog_grooming' ? 'dog' : null;
         this.step = 2;
         this._renderStep($('#app'));
       });
@@ -1759,107 +1764,133 @@ const BookingView = {
 
   _renderTypeSelection(el) {
     const services = this._services.filter(s => s.category === this.selectedCategory);
-    const catLabels = { cat_grooming: '🐱 حلاقة قطة', dog_grooming: '🐕 حلاقة كلب', bath: '🛁 تحميم' };
+    const categoryNames = {
+      'cat_grooming': '🐱 حلاقة قطة',
+      'dog_grooming': '🐕 حلاقة الكلب',
+      'bath': '🛁 تحميم'
+    };
 
-    const bathPetHtml = this.selectedCategory === 'bath' ? `
-      <div class="bk-pet-selector">
-        <p class="bk-pet-label">نوع الحيوان:</p>
-        <div class="bk-pet-btns">
-          <button class="bk-pet-btn ${this.petType === 'cat' ? 'active' : ''}" id="pet-cat">
-            <img src="assets/alkokh_icons/cat.png" alt="قطة"> قطة
-          </button>
-          <button class="bk-pet-btn ${this.petType === 'dog' ? 'active' : ''}" id="pet-dog">
-            <img src="assets/alkokh_icons/dog.png" alt="كلب"> كلب
-          </button>
-        </div>
+    let html = `
+      <div style="text-align:center; margin-bottom: 20px;">
+        <h2 style="font-size:1.3rem; font-weight:800; margin-bottom:4px;">${categoryNames[this.selectedCategory]}</h2>
+        <p style="color:var(--text-secondary); font-size:0.9rem;">اختر نوع الخدمة</p>
       </div>
-    ` : '';
-
-    el.innerHTML = `
-      <div class="bk-type-panel">
-        <div class="bk-type-header">
-          <span class="bk-type-title">${catLabels[this.selectedCategory]}</span>
-          <span class="bk-type-sub">اختر نوع الخدمة</span>
-        </div>
-        ${bathPetHtml}
-        <div class="bk-type-grid">
-          ${services.map(svc => `
-            <button class="bk-type-btn" data-service-id="${escHtml(svc.id)}">
-              <img src="${escHtml(svc.icon)}" alt="${escHtml(svc.type_ar)}" class="bk-type-icon">
-              <span>${escHtml(svc.type_ar)}</span>
-            </button>
-          `).join('')}
-        </div>
-        <button class="bk-back-btn" id="back-to-step1">← رجوع</button>
-      </div>
+      <div class="type-grid">
     `;
 
-    el.querySelector('#pet-cat')?.addEventListener('click', () => { this.petType = 'cat'; this._renderStep($('#app')); });
-    el.querySelector('#pet-dog')?.addEventListener('click', () => { this.petType = 'dog'; this._renderStep($('#app')); });
+    services.forEach(svc => {
+      html += `
+        <button class="type-btn" data-service-id="${svc.id}" id="type-${svc.id}">
+          <span class="type-icon"><img src="${svc.icon}" alt="${svc.type_ar}"></span>
+          <span>${svc.type_ar}</span>
+        </button>
+      `;
+    });
 
-    el.querySelectorAll('.bk-type-btn').forEach(btn => {
+    html += `</div>
+      <div style="text-align:center; margin-top:20px;">
+        <button class="btn btn-ghost" id="back-to-step1">→ رجوع</button>
+      </div>`;
+
+    el.innerHTML = html;
+
+    // If bath, ask about pet type
+    if (this.selectedCategory === 'bath') {
+      const petSelector = document.createElement('div');
+      petSelector.style.cssText = 'text-align:center; margin-bottom:20px;';
+      petSelector.innerHTML = `
+        <p style="font-weight:700; margin-bottom:12px;">نوع الحيوان:</p>
+        <div style="display:flex;gap:20px;justify-content:center;">
+          <button class="btn pet-btn ${this.petType === 'cat' ? 'pet-btn-active' : ''}" id="pet-cat">
+            <img src="assets/alkokh_icons/cat.png" class="pet-icon">
+            <span>قطة</span>
+          </button>
+          <button class="btn pet-btn ${this.petType === 'dog' ? 'pet-btn-active' : ''}" id="pet-dog">
+            <img src="assets/alkokh_icons/dog.png" class="pet-icon">
+            <span>كلب</span>
+          </button>
+        </div>
+      `;
+      el.querySelector('.type-grid').before(petSelector);
+
+      el.querySelector('#pet-cat')?.addEventListener('click', () => {
+        this.petType = 'cat';
+        this._renderStep($('#app'));
+      });
+      el.querySelector('#pet-dog')?.addEventListener('click', () => {
+        this.petType = 'dog';
+        this._renderStep($('#app'));
+      });
+    }
+
+    el.querySelectorAll('.type-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (this.selectedCategory === 'bath' && !this.petType) {
-          showToast('الرجاء اختيار نوع الحيوان أولاً', 'warning'); return;
-        }
         this.selectedServiceId = btn.dataset.serviceId;
+        if (this.selectedCategory === 'bath' && !this.petType) {
+          showToast('الرجاء اختيار نوع الحيوان أولاً', 'warning');
+          return;
+        }
         this.step = 3;
         this._renderStep($('#app'));
       });
     });
 
-    el.querySelector('#back-to-step1')?.addEventListener('click', () => { this.step = 1; this._renderStep($('#app')); });
+    el.querySelector('#back-to-step1')?.addEventListener('click', () => {
+      this.step = 1;
+      this._renderStep($('#app'));
+    });
   },
 
   _renderInfoForm(el) {
     const service = this._services.find(s => s.id === this.selectedServiceId);
 
     el.innerHTML = `
-      <div class="bk-form-panel">
-        ${service ? `
-          <div class="bk-service-badge">
-            <img src="${escHtml(service.icon)}" alt="${escHtml(service.type_ar)}" class="bk-badge-icon">
-            <span>${escHtml(service.type_ar)}</span>
+      <div class="card" style="max-width:500px; margin:0 auto;">
+        <div class="card-body">
+          <div style="text-align:center; margin-bottom:24px;">
+            <div class="order-service" style="display:inline-flex; padding:8px 20px; font-size:0.95rem;">
+              <img src="${service?.icon || ''}" class="icon-inline"> ${service?.type_ar || ''}
+            </div>
           </div>
-        ` : ''}
-
-        <div class="bk-form-grid">
-          <label class="form-field">
-            <span>اسم صاحب الحيوان <em>*</em></span>
-            <input type="text" id="customer-name" placeholder="مثال: أحمد" autocomplete="off">
-          </label>
-          <label class="form-field">
-            <span>رقم الهاتف <em>*</em></span>
-            <input type="tel" id="customer-phone" placeholder="07XXXXXXXXX" autocomplete="tel" dir="ltr">
-          </label>
-          <label class="form-field">
-            <span>اسم الحيوان <em>*</em></span>
-            <input type="text" id="pet-name" placeholder="مثال: بادي" autocomplete="off">
-          </label>
-          <label class="form-field">
-            <span>ملاحظات (اختياري)</span>
-            <input type="text" id="order-notes" placeholder="أي تفاصيل إضافية...">
-          </label>
+          <div class="form-group">
+            <label class="form-label">اسم صاحب الحيوان *</label>
+            <input type="text" class="form-input" id="customer-name" placeholder="مثال: أحمد" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">رقم الهاتف *</label>
+            <input type="tel" class="form-input" id="customer-phone" placeholder="مثال: 07801234567" autocomplete="tel" dir="ltr" style="text-align:left;" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">اسم الحيوان *</label>
+            <input type="text" class="form-input" id="pet-name" placeholder="مثال: بادي" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ملاحظات (اختياري)</label>
+            <input type="text" class="form-input" id="order-notes" placeholder="أي تفاصيل إضافية..." autocomplete="off">
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" id="submit-booking" style="margin-top:8px;">
+            <span id="booking-btn-text">📋 تأكيد الحجز</span>
+            <span id="booking-btn-loading" style="display:none;">
+              <span class="btn-spinner"></span> جاري التسجيل...
+            </span>
+          </button>
+          <div style="text-align:center; margin-top:16px;">
+            <button class="btn btn-ghost" id="back-to-step2">→ رجوع</button>
+          </div>
         </div>
-
-        <button class="btn btn-primary btn-lg btn-block" id="submit-booking" style="margin-top:8px;">
-          <span id="booking-btn-text">📋 تأكيد الحجز</span>
-          <span id="booking-btn-loading" style="display:none;"><span class="btn-spinner"></span> جاري التسجيل...</span>
-        </button>
-        <button class="bk-back-btn" id="back-to-step2" style="margin-top:12px;">← رجوع</button>
       </div>
     `;
 
     el.querySelector('#submit-booking')?.addEventListener('click', async () => {
-      const customerName  = el.querySelector('#customer-name')?.value.trim();
+      const customerName = el.querySelector('#customer-name')?.value.trim();
       const customerPhone = el.querySelector('#customer-phone')?.value.trim();
-      const petName       = el.querySelector('#pet-name')?.value.trim();
-      const notes         = el.querySelector('#order-notes')?.value.trim();
-      const submitBtn     = el.querySelector('#submit-booking');
+      const petName = el.querySelector('#pet-name')?.value.trim();
+      const notes = el.querySelector('#order-notes')?.value.trim();
+      const submitBtn = el.querySelector('#submit-booking');
 
-      if (!customerName)  { showToast('الرجاء إدخال اسم صاحب الحيوان', 'warning'); el.querySelector('#customer-name')?.focus(); return; }
+      if (!customerName) { showToast('الرجاء إدخال اسم صاحب الحيوان', 'warning'); el.querySelector('#customer-name')?.focus(); return; }
       if (!customerPhone) { showToast('الرجاء إدخال رقم الهاتف', 'warning'); el.querySelector('#customer-phone')?.focus(); return; }
-      if (!petName)       { showToast('الرجاء إدخال اسم الحيوان', 'warning'); el.querySelector('#pet-name')?.focus(); return; }
+      if (!petName) { showToast('الرجاء إدخال اسم الحيوان', 'warning'); el.querySelector('#pet-name')?.focus(); return; }
 
       el.querySelector('#booking-btn-text').style.display = 'none';
       el.querySelector('#booking-btn-loading').style.display = 'inline-flex';
@@ -1867,18 +1898,22 @@ const BookingView = {
 
       try {
         const newOrderId = await DB.addOrder({
-          customer_name: customerName, customer_phone: customerPhone || null,
-          pet_name: petName, pet_type: this.petType,
-          service_id: this.selectedServiceId, notes: notes || ''
+          customer_name: customerName,
+          customer_phone: customerPhone || null,
+          pet_name: petName,
+          pet_type: this.petType,
+          service_id: this.selectedServiceId,
+          notes: notes || ''
         });
+
         if (customerPhone) {
           WhatsApp.sendBookingConfirmation(
             customerPhone, customerName, petName, service?.type_ar || '',
             typeof newOrderId === 'string' ? newOrderId : null
           ).catch(() => {});
         }
+
         playNotificationSound();
-        this.lastOrderId = typeof newOrderId === 'string' ? newOrderId : null;
         this.step = 4;
         this._renderStep($('#app'));
       } catch (err) {
@@ -1890,88 +1925,34 @@ const BookingView = {
       }
     });
 
-    el.querySelector('#back-to-step2')?.addEventListener('click', () => { this.step = 2; this._renderStep($('#app')); });
+    el.querySelector('#back-to-step2')?.addEventListener('click', () => {
+      this.step = 2;
+      this._renderStep($('#app'));
+    });
+
     setTimeout(() => el.querySelector('#customer-name')?.focus(), 300);
   },
 
   async _renderConfirmation(el) {
     const waitingCount = await DB.getWaitingCount();
-    const orderId = this.lastOrderId;
-    const qrUrl = orderId
-      ? `${window.location.origin}${window.location.pathname}#order/${orderId}`
-      : null;
 
     el.innerHTML = `
-      <div class="bk-confirm-page animate-in">
-        <div class="bk-confirm-header">
-          <div class="bk-confirm-check">
-            <svg viewBox="0 0 52 52" fill="none">
-              <circle cx="26" cy="26" r="25" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
-              <path d="M14 27l8 8 16-16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h1 class="bk-confirm-title">تم تسجيل الحجز!</h1>
-          <p class="bk-confirm-sub">تمت إضافة رفيقك إلى قائمة الانتظار</p>
-        </div>
-
-        <div class="bk-queue-card">
-          <div class="bk-queue-label">ترتيبك في قائمة الانتظار</div>
-          <div class="bk-queue-number">${waitingCount}</div>
-          <div class="bk-queue-hint">سيتم استدعاؤك قريباً ✂️</div>
-        </div>
-
-        ${qrUrl ? `
-        <div class="qr-glass-card">
-          <div class="qr-glass-card-label">
-            <span class="qr-label-dot"></span>
-            رمز حجزك
-          </div>
-          <div class="qr-code-wrapper">
-            <div id="booking-qr" class="qr-canvas"></div>
-          </div>
-          <p class="qr-glass-hint">📌 احتفظ بهذا الرمز — يمكن مسحه لمتابعة حالة حجزك</p>
-          <div class="qr-glass-actions">
-            <button type="button" id="bk-qr-download" class="qr-action-btn">
-              <span>⬇️</span> حفظ
-            </button>
-            <button type="button" id="bk-qr-print" class="qr-action-btn">
-              <span>🖨️</span> طباعة
-            </button>
-          </div>
-        </div>
-        ` : ''}
-
-        <button class="bk-new-btn" id="new-booking">➕ حجز خدمة جديدة</button>
-        <a href="#home" class="qr-back-btn" style="margin-top:10px;">← العودة للرئيسية</a>
+      <div class="confirmation">
+        <div class="checkmark">✅</div>
+        <h2>تم تسجيل الحجز بنجاح!</h2>
+        <p>تمت إضافة رفيقك إلى قائمة الانتظار</p>
+        <div class="queue-number">${waitingCount}</div>
+        <p style="font-size:0.85rem; margin-bottom:24px;">ترتيبك في قائمة الانتظار</p>
+        <button class="btn btn-primary btn-lg" id="new-booking">
+          ➕ حجز خدمة جديدة
+        </button>
       </div>
     `;
 
-    if (qrUrl) {
-      const qrEl = document.getElementById('booking-qr');
-      const renderQR = () => {
-        if (!window.QRCode) return setTimeout(renderQR, 200);
-        try {
-          new window.QRCode(qrEl, {
-            text: qrUrl,
-            width: 240,
-            height: 240,
-            colorDark: '#1a1a1a',
-            colorLight: '#ffffff',
-            correctLevel: window.QRCode.CorrectLevel.H,
-          });
-        } catch (e) { qrEl.textContent = qrUrl; }
-      };
-      renderQR();
-      document.getElementById('bk-qr-download')?.addEventListener('click', () => {
-        const img = qrEl.querySelector('img') || qrEl.querySelector('canvas');
-        if (!img) return;
-        const src = img.tagName === 'IMG' ? img.src : img.toDataURL('image/png');
-        const a = document.createElement('a'); a.download = `alkokh-order-${orderId}.png`; a.href = src; a.click();
-      });
-      document.getElementById('bk-qr-print')?.addEventListener('click', () => window.print());
-    }
-
-    el.querySelector('#new-booking')?.addEventListener('click', () => { this.step = 1; this.lastOrderId = null; this._renderStep($('#app')); });
+    el.querySelector('#new-booking')?.addEventListener('click', () => {
+      this.step = 1;
+      this._renderStep($('#app'));
+    });
   }
 };
 
