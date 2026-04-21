@@ -1,0 +1,312 @@
+/* ===================================================
+   EMPLOYEES MANAGEMENT VIEW — Unified Staff Directory
+   Doctors, Groomers, Bathers
+   =================================================== */
+
+.employees-section {
+  margin-top: 48px;
+  padding-bottom: 32px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.employees-section:last-child {
+  border-bottom: none;
+}
+
+.section-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.employees-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  animation: fadeInUp 0.5s var(--ease-out);
+}
+
+.employee-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--duration-normal) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+
+.employee-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+  border-color: var(--purple-300);
+}
+
+/* Card Header */
+.employee-card-header {
+  background: linear-gradient(135deg, rgba(192, 38, 211, 0.1) 0%, rgba(168, 28, 175, 0.05) 100%);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.employee-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--white);
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+}
+
+.employee-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.employee-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+  word-break: break-word;
+}
+
+.employee-type {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.employee-info .badge {
+  font-size: 0.75rem;
+  margin-top: 4px;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.badge-admin {
+  background: linear-gradient(135deg, var(--purple-400), var(--purple-500));
+  color: var(--white) !important;
+  border: none !important;
+}
+
+/* Card Body */
+.employee-card-body {
+  padding: 20px;
+  flex: 1;
+}
+
+.employee-field {
+  margin-bottom: 16px;
+}
+
+.employee-field:last-child {
+  margin-bottom: 0;
+}
+
+.employee-field label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.employee-field p {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0;
+  word-break: break-all;
+}
+
+/* Card Actions */
+.employee-card-actions {
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.employee-card-actions .btn {
+  flex: 1;
+  min-width: 80px;
+  font-size: 0.8rem;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+/* Status Colors */
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--purple-100);
+  color: var(--purple-900);
+  border: 1px solid var(--purple-200);
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+/* Button Styles for Employee Card */
+.btn-sm {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--purple-300);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.btn-success:hover {
+  background: #a7f3d0;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.btn-warning:hover {
+  background: #fde68a;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.btn-danger:hover {
+  background: #fecaca;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Grid */
+@media (max-width: 768px) {
+  .employees-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-card-header {
+    padding: 16px;
+  }
+
+  .employee-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 1.2rem;
+  }
+
+  .employee-name {
+    font-size: 1rem;
+  }
+
+  .employee-card-actions {
+    flex-direction: column;
+  }
+
+  .employee-card-actions .btn {
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+/* Dark Theme (if needed) */
+[data-theme="dark"] .employee-card {
+  background: var(--gray-900);
+  border-color: var(--gray-800);
+}
+
+[data-theme="dark"] .employee-card-header {
+  background: rgba(192, 38, 211, 0.08);
+  border-color: var(--gray-800);
+}
+
+[data-theme="dark"] .employee-card-body {
+  border-color: var(--gray-800);
+}
+
+[data-theme="dark"] .employee-card-actions {
+  background: rgba(0, 0, 0, 0.1);
+  border-color: var(--gray-800);
+}
+
+[data-theme="dark"] .badge {
+  background: rgba(192, 38, 211, 0.15);
+  color: var(--purple-200);
+  border-color: var(--purple-300);
+}
