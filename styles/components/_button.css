@@ -1,0 +1,126 @@
+/* ============================================================
+   Button — unified control for all CTAs.
+   Variants: primary (brand), secondary, ghost, danger, success, outline.
+   Sizes: sm (36), md (44, default), lg (52), xl (64 with large radius).
+   Modifiers: .btn-block (full width), .btn-icon (round square).
+   Scoped under .btn-next to avoid conflicting with legacy .btn in
+   main.js-rendered views until view rewrites migrate to the new set.
+   ============================================================ */
+
+.btn-next {
+  --btn-bg: var(--brand);
+  --btn-bg-hover: var(--brand-hover);
+  --btn-fg: var(--fg-on-brand);
+  --btn-border: transparent;
+  --btn-shadow: var(--sh-sm);
+  --btn-radius: var(--r-pill);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 var(--sp-6);
+  font-family: var(--font-ar);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--btn-fg);
+  background: var(--btn-bg);
+  border: 1.5px solid var(--btn-border);
+  border-radius: var(--btn-radius);
+  box-shadow: var(--btn-shadow);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-spring);
+  white-space: nowrap;
+}
+
+.btn-next:hover { background: var(--btn-bg-hover); }
+.btn-next:active { transform: scale(0.97); }
+.btn-next:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-ring-brand);
+}
+.btn-next[disabled],
+.btn-next[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  pointer-events: none;
+}
+
+/* Variants */
+.btn-next.variant-primary {
+  --btn-bg: var(--brand);
+  --btn-bg-hover: var(--brand-hover);
+  --btn-fg: var(--fg-on-brand);
+}
+.btn-next.variant-secondary {
+  --btn-bg: var(--bg-surface);
+  --btn-bg-hover: var(--bg-sunken);
+  --btn-fg: var(--fg-primary);
+  --btn-border: var(--border-subtle);
+}
+.btn-next.variant-ghost {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--brand-soft);
+  --btn-fg: var(--brand);
+  --btn-border: transparent;
+  --btn-shadow: none;
+}
+.btn-next.variant-danger {
+  --btn-bg: var(--c-danger);
+  --btn-bg-hover: #dc2626;
+  --btn-fg: #fff;
+}
+.btn-next.variant-success {
+  --btn-bg: var(--c-success);
+  --btn-bg-hover: #059669;
+  --btn-fg: #fff;
+}
+.btn-next.variant-outline {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--bg-sunken);
+  --btn-fg: var(--fg-primary);
+  --btn-border: var(--border-strong);
+  --btn-shadow: none;
+}
+
+/* Sizes */
+.btn-next.size-sm { min-height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-sm); }
+.btn-next.size-md { min-height: 44px; padding: 0 var(--sp-6); }
+.btn-next.size-lg { min-height: 52px; padding: 0 var(--sp-8); font-size: var(--fs-lg); }
+.btn-next.size-xl {
+  min-height: 64px;
+  padding: 0 var(--sp-10);
+  font-size: var(--fs-xl);
+  border-radius: var(--r-xl);
+}
+
+.btn-next.block { width: 100%; }
+.btn-next.icon {
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--r-pill);
+}
+
+.btn-next .btn-next-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: btn-next-spin 600ms linear infinite;
+}
+
+@keyframes btn-next-spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,170 @@
+/* ============================================================
+   OrderCard — shared across Operator & Employee views.
+   Left accent stripe encodes status. Structure is identical in
+   light and dark via semantic tokens; Operator adds action rows.
+   Scoped under .order-next.
+   ============================================================ */
+
+.order-next {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  padding-inline-start: calc(var(--sp-5) + 4px);
+  margin-bottom: var(--sp-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  transition:
+    box-shadow var(--t-base) var(--ease-out),
+    transform var(--t-base) var(--ease-spring),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.order-next::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  background: var(--fg-muted);
+  border-radius: var(--r-pill);
+}
+
+.order-next.status-waiting::before     { background: var(--c-waiting); }
+.order-next.status-assigned::before    { background: var(--c-assigned); }
+.order-next.status-in_progress::before { background: var(--c-progress); }
+.order-next.status-completed::before   { background: var(--c-success); }
+.order-next.status-cancelled::before   { background: var(--c-danger); }
+
+.order-next:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh-md);
+  border-color: var(--border-strong);
+}
+
+.order-next-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.order-next-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.order-next-avatar {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-sunken);
+  border-radius: var(--r-pill);
+  flex-shrink: 0;
+}
+
+.order-next-avatar img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.order-next-pet {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-extrabold);
+  color: var(--fg-primary);
+  line-height: var(--lh-snug);
+}
+
+.order-next-customer {
+  font-size: var(--fs-sm);
+  color: var(--fg-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.order-next-customer .order-next-phone {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+
+.order-next-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.order-next-service {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  background: var(--brand-soft);
+  color: var(--brand-soft-fg);
+  border: 1px solid color-mix(in oklab, var(--brand) 30%, transparent);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.order-next-service img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.order-next-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-bold);
+  color: var(--c-progress);
+  direction: ltr;
+}
+
+.order-next-notes {
+  padding: var(--sp-3);
+  background: var(--bg-sunken);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  color: var(--fg-secondary);
+  line-height: var(--lh-normal);
+}
+
+.order-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.order-next-actions > * { flex: 1 1 auto; min-width: 120px; }
+
+.order-next-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-extrabold);
+  color: var(--fg-primary);
+}

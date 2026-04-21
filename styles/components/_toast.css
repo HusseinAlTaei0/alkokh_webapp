@@ -1,0 +1,57 @@
+/* ============================================================
+   Toast — lightweight notifications. Additive — the legacy toast
+   CSS still lives in index.css and both selectors coexist.
+   ============================================================ */
+
+.toast-next-container {
+  position: fixed;
+  top: var(--sp-6);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  z-index: var(--z-toast);
+  pointer-events: none;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.toast-next {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-elevated);
+  color: var(--fg-primary);
+  border: 1px solid var(--border-subtle);
+  border-inline-start: 4px solid var(--fg-muted);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  pointer-events: auto;
+  animation: toast-next-in var(--t-base) var(--ease-out);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.toast-next.tone-success { border-inline-start-color: var(--c-success); }
+.toast-next.tone-danger  { border-inline-start-color: var(--c-danger); }
+.toast-next.tone-warn    { border-inline-start-color: var(--c-waiting); }
+.toast-next.tone-info    { border-inline-start-color: var(--c-info); }
+
+.toast-next-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  background: var(--bg-sunken);
+  font-size: var(--fs-sm);
+  color: var(--fg-primary);
+  flex-shrink: 0;
+}
+
+@keyframes toast-next-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

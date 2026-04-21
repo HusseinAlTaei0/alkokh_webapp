@@ -13,9 +13,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- FOUC-prevention: apply theme before stylesheets load -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('alkokh-theme');
+        var mode = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', mode);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Base styles (legacy + medical clinic) -->
   <link rel="stylesheet" href="index.css">
+  <!-- New design system (tokens + components + view redesigns) -->
+  <link rel="stylesheet" href="styles/index.css">
 </head>
 <body>
   <!-- Animated Background -->
@@ -29,6 +46,29 @@
         <span class="nav-title">الكوخ</span>
       </div>
       <div class="nav-actions">
+        <button
+          id="theme-toggle"
+          type="button"
+          class="theme-toggle"
+          aria-label="التبديل إلى الوضع الداكن"
+          aria-pressed="false">
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" fill="currentColor"/>
+            <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="12" y1="2"  x2="12" y2="5"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+              <line x1="2"  y1="12" x2="5"  y2="12"/>
+              <line x1="19" y1="12" x2="22" y2="12"/>
+              <line x1="4.2" y1="4.2"   x2="6.3"  y2="6.3"/>
+              <line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/>
+              <line x1="4.2" y1="19.8"  x2="6.3"  y2="17.7"/>
+              <line x1="17.7" y1="6.3"  x2="19.8" y2="4.2"/>
+            </g>
+          </svg>
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" fill="currentColor"/>
+          </svg>
+        </button>
         <button id="logout-btn" class="logout-btn" style="display:none;" title="تسجيل الخروج">
           <span class="logout-icon">🚪</span>
           <span class="logout-text">خروج</span>

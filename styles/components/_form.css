@@ -1,0 +1,64 @@
+/* ============================================================
+   Form — shared layout primitives for multi-field screens.
+   Works alongside `_input.css` (which styles the field itself).
+   ============================================================ */
+
+.form-next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+.form-next-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.form-next-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+
+@media (max-width: 640px) {
+  .form-next-grid { grid-template-columns: 1fr; }
+}
+
+.form-next-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+.form-next-actions.stack { flex-direction: column; }
+.form-next-actions.end   { justify-content: flex-end; }
+
+.form-next-hint {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  line-height: var(--lh-normal);
+}
+
+.form-next-error {
+  font-size: var(--fs-sm);
+  color: var(--c-danger);
+  line-height: var(--lh-snug);
+}
+
+.form-next-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+}
+
+.form-next-section-title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--fg-primary);
+}

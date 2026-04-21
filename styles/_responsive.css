@@ -1,0 +1,237 @@
+/* ============================================================
+   RESPONSIVE POLISH — Commit 12
+   Cross-cutting refinements that pull the whole app toward a
+   phone-first experience without touching markup. Ordered from
+   widest to narrowest so later rules refine earlier ones.
+   ============================================================ */
+
+/* ---- Larger phones / small tablets (≤768px) ---- */
+@media (max-width: 768px) {
+  .app-container {
+    padding-left: var(--sp-4);
+    padding-right: var(--sp-4);
+    padding-bottom: var(--sp-20);
+  }
+
+  /* Nav: compress title + keep actions visible */
+  .nav-inner {
+    padding: 0 var(--sp-4);
+  }
+  .nav-title {
+    font-size: var(--fs-md);
+  }
+  .nav-logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Fullscreen menu: scaled-down typography */
+  .menu-link .menu-text {
+    font-size: 2.5rem;
+    letter-spacing: -1px;
+  }
+
+  /* Grids reflow */
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .service-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Page headers */
+  .page-header h1 {
+    font-size: var(--fs-xl);
+  }
+
+  /* Booking steps: wrap, hide connectors */
+  .booking-steps {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .step-connector {
+    display: none;
+  }
+
+  /* Chart containers shrink on phone */
+  .chart-container {
+    height: 220px;
+  }
+
+  /* Order action buttons stack */
+  .order-actions {
+    flex-direction: column;
+  }
+  .order-actions .btn {
+    width: 100%;
+  }
+
+  /* Employee buttons take full row */
+  .employee-btn {
+    min-width: 0;
+    flex: 1 1 calc(50% - var(--sp-2));
+  }
+}
+
+/* ---- Small phones (≤480px) ---- */
+@media (max-width: 480px) {
+  .app-container {
+    padding-left: var(--sp-3);
+    padding-right: var(--sp-3);
+  }
+
+  /* Typography step down */
+  .page-header h1 {
+    font-size: var(--fs-lg);
+  }
+  .page-header p {
+    font-size: var(--fs-sm);
+  }
+
+  /* Stat cards: 2×2 grid with tight gap */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-3);
+  }
+  .stat-card {
+    padding: var(--sp-4);
+  }
+  .stat-value {
+    font-size: 1.75rem;
+  }
+  .stat-label {
+    font-size: var(--fs-xs);
+  }
+
+  /* Type grid: 2 columns */
+  .type-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Order card tightening */
+  .queue-section .order-card {
+    padding: var(--sp-4);
+  }
+  .order-pet-info h3 {
+    font-size: var(--fs-md);
+  }
+
+  /* Tab filter: fill row */
+  .tab-filter {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tab-filter::-webkit-scrollbar {
+    display: none;
+  }
+  .tab-filter-btn {
+    flex: 1 1 auto;
+    white-space: nowrap;
+  }
+
+  /* Toast stays readable */
+  .toast-container {
+    width: calc(100% - var(--sp-6));
+  }
+  .toast {
+    font-size: var(--fs-sm);
+  }
+
+  /* Employee avatar bubble shrinks */
+  .employee-btn {
+    flex: 1 1 100%;
+  }
+
+  /* Step indicator: hide labels (keep numbers) */
+  .booking-steps .step-label {
+    display: none;
+  }
+
+  /* Logout button text hides */
+  .logout-text {
+    display: none;
+  }
+  .logout-btn {
+    padding: 6px 10px;
+  }
+
+  /* Menu toggle: compress */
+  .menu-toggle-btn {
+    padding: 8px 14px;
+    font-size: var(--fs-sm);
+  }
+}
+
+/* ---- Tiny phones (≤360px) ---- */
+@media (max-width: 360px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .pin-digit {
+    width: 44px;
+    height: 56px;
+    font-size: 1.25rem;
+  }
+  .menu-link .menu-text {
+    font-size: 2rem;
+  }
+}
+
+/* ---- Larger touch targets on pointer:coarse ---- */
+@media (pointer: coarse) {
+  .btn,
+  .employee-btn,
+  .type-btn,
+  .pet-btn,
+  .tab-filter-btn {
+    min-height: 44px;
+  }
+  .password-toggle,
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ---- Smooth horizontal scroll for filter rows ---- */
+.filters-row,
+.tab-filter {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- Reduce motion for accessibility ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .floating-paw {
+    display: none;
+  }
+}
+
+/* ---- Landscape phone: keep nav from shrinking content ---- */
+@media (max-height: 500px) and (orientation: landscape) {
+  .login-container,
+  .employee-login-container {
+    min-height: auto;
+    padding-top: var(--sp-4);
+    padding-bottom: var(--sp-4);
+  }
+  .confirmation {
+    padding: var(--sp-6) var(--sp-4);
+  }
+  .confirmation .checkmark {
+    width: 60px;
+    height: 60px;
+    font-size: 1.75rem;
+  }
+}

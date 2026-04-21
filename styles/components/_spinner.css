@@ -1,0 +1,35 @@
+/* ============================================================
+   Spinner — consistent loading indicator.
+   Sizes: sm (14), md (20, default), lg (32).
+   ============================================================ */
+
+.spinner-next {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: spinner-next-rotate 600ms linear infinite;
+  vertical-align: middle;
+  color: var(--brand);
+}
+
+.spinner-next.size-sm { width: 14px; height: 14px; border-width: 2px; }
+.spinner-next.size-md { width: 20px; height: 20px; border-width: 2px; }
+.spinner-next.size-lg { width: 32px; height: 32px; border-width: 3px; }
+
+.loading-next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-10);
+  color: var(--fg-secondary);
+  font-weight: var(--fw-semibold);
+}
+
+@keyframes spinner-next-rotate {
+  to { transform: rotate(360deg); }
+}

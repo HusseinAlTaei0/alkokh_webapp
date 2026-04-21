@@ -1,0 +1,99 @@
+/* ============================================================
+   Input — consistent inputs and labels with LTR/RTL awareness.
+   Scoped under .input-next to coexist with legacy .form-input.
+   ============================================================ */
+
+.input-next-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+}
+
+.input-next-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-secondary);
+}
+
+.input-next-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-next {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--sp-5);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  color: var(--fg-primary);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+
+.input-next::placeholder {
+  color: var(--fg-muted);
+}
+
+.input-next:hover {
+  border-color: var(--border-strong);
+}
+
+.input-next:focus-visible,
+.input-next:focus {
+  border-color: var(--brand);
+  box-shadow: var(--sh-ring-brand);
+}
+
+.input-next[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input-next.invalid {
+  border-color: var(--c-danger);
+}
+
+.input-next.invalid:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
+}
+
+/* Inline affordance (password toggle, clear button) */
+.input-next-affix {
+  position: absolute;
+  inset-inline-end: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+
+.input-next-affix:hover {
+  color: var(--fg-primary);
+  background: var(--bg-sunken);
+}
+
+/* Helper text under the input */
+.input-next-help {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+
+.input-next-error {
+  font-size: var(--fs-xs);
+  color: var(--c-danger);
+}

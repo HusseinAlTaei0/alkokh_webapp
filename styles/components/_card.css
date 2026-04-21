@@ -1,0 +1,74 @@
+/* ============================================================
+   Card — surface container for content.
+   Modifiers: .card-next.elevated (raised), .card-next.glass (blurred),
+   .card-next.interactive (hoverable), .card-next.padded (default inner pad).
+   Scoped under .card-next to coexist with legacy .card.
+   ============================================================ */
+
+.card-next {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  color: var(--fg-primary);
+  transition:
+    box-shadow var(--t-base) var(--ease-out),
+    transform var(--t-base) var(--ease-spring),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.card-next.padded {
+  padding: var(--sp-6);
+}
+
+.card-next.elevated {
+  box-shadow: var(--sh-md);
+}
+
+.card-next.glass {
+  background: var(--surface-glass);
+  border-color: var(--surface-glass-border);
+  backdrop-filter: var(--surface-glass-blur);
+  -webkit-backdrop-filter: var(--surface-glass-blur);
+}
+
+.card-next.interactive {
+  cursor: pointer;
+}
+
+.card-next.interactive:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--sh-md);
+  transform: translateY(-2px);
+}
+
+.card-next.interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-ring-brand);
+}
+
+.card-next-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.card-next-title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-extrabold);
+  line-height: var(--lh-snug);
+}
+
+.card-next-subtitle {
+  font-size: var(--fs-sm);
+  color: var(--fg-secondary);
+  margin-top: var(--sp-1);
+}
+
+.card-next-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}

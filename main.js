@@ -5,6 +5,73 @@
    ============================================= */
 
 // ==========================================
+// THEME MODULE (light/dark mode)
+// ==========================================
+const Theme = {
+  _key: 'alkokh-theme',
+  _manualFlag: 'alkokh-theme-manual',
+
+  get() {
+    try {
+      const stored = localStorage.getItem(this._key);
+      if (stored === 'light' || stored === 'dark') return stored;
+    } catch (_) {}
+    const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    return mq && mq.matches ? 'dark' : 'light';
+  },
+
+  set(mode, manual = true) {
+    if (mode !== 'light' && mode !== 'dark') return;
+    document.documentElement.dataset.theme = mode;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', mode === 'dark' ? '#070910' : '#F5F3FF');
+    try {
+      localStorage.setItem(this._key, mode);
+      if (manual) localStorage.setItem(this._manualFlag, '1');
+    } catch (_) {}
+    this._refreshBtn();
+  },
+
+  toggle() { this.set(this.get() === 'dark' ? 'light' : 'dark'); },
+
+  _refreshBtn() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    const mode = this.get();
+    btn.setAttribute('aria-pressed', mode === 'dark' ? 'true' : 'false');
+    btn.setAttribute('aria-label', mode === 'dark' ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن');
+    btn.dataset.mode = mode;
+  },
+
+  init() {
+    // Apply saved theme immediately
+    this.set(this.get(), false);
+
+    // Bind toggle button
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('theme-toggle');
+      if (btn && !btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => this.toggle());
+        this._refreshBtn();
+      }
+    });
+
+    // Watch system preference
+    const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq) {
+      const handler = (e) => {
+        try { if (localStorage.getItem(this._manualFlag) === '1') return; } catch (_) {}
+        this.set(e.matches ? 'dark' : 'light', false);
+      };
+      if (mq.addEventListener) mq.addEventListener('change', handler);
+      else if (mq.addListener) mq.addListener(handler);
+    }
+  }
+};
+Theme.init();
+
+// ==========================================
 // AUTH MODULE
 // ==========================================
 const Auth = {

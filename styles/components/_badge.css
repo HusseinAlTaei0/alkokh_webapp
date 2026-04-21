@@ -1,0 +1,73 @@
+/* ============================================================
+   Badge — compact status pills.
+   Scoped under .badge-next to coexist with legacy .badge.
+   ============================================================ */
+
+.badge-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: 22px;
+  padding: 2px var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.badge-next.tone-waiting {
+  color: var(--c-waiting);
+  background: var(--bg-waiting);
+  border-color: color-mix(in oklab, var(--c-waiting) 30%, transparent);
+}
+.badge-next.tone-assigned {
+  color: var(--c-assigned);
+  background: var(--bg-assigned);
+  border-color: color-mix(in oklab, var(--c-assigned) 30%, transparent);
+}
+.badge-next.tone-progress {
+  color: var(--c-progress);
+  background: var(--bg-progress);
+  border-color: color-mix(in oklab, var(--c-progress) 30%, transparent);
+}
+.badge-next.tone-success {
+  color: var(--c-success);
+  background: var(--bg-success);
+  border-color: color-mix(in oklab, var(--c-success) 30%, transparent);
+}
+.badge-next.tone-danger {
+  color: var(--c-danger);
+  background: var(--bg-danger);
+  border-color: color-mix(in oklab, var(--c-danger) 30%, transparent);
+}
+.badge-next.tone-neutral {
+  color: var(--fg-secondary);
+  background: var(--bg-sunken);
+  border-color: var(--border-subtle);
+}
+.badge-next.tone-brand {
+  color: var(--brand-soft-fg);
+  background: var(--brand-soft);
+  border-color: color-mix(in oklab, var(--brand) 30%, transparent);
+}
+
+.badge-next.size-sm { min-height: 20px; padding: 1px var(--sp-2); font-size: 0.7rem; }
+.badge-next.size-lg { min-height: 26px; padding: 3px var(--sp-4); font-size: var(--fs-sm); }
+
+/* Pulse dot for "live" indicators */
+.badge-next .badge-next-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: badge-next-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes badge-next-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.7); }
+}

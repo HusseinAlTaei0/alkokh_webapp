@@ -1,0 +1,50 @@
+/* ============================================================
+   Progress — linear progress bars (leaderboard workload, steps).
+   ============================================================ */
+
+.progress-next {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-sunken);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-next-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(
+    to inline-end,
+    var(--brand),
+    color-mix(in oklab, var(--brand) 70%, var(--c-info) 30%)
+  );
+  border-radius: var(--r-pill);
+  transition: width var(--t-slow) var(--ease-out);
+}
+
+.progress-next.tone-success .progress-next-fill { background: var(--c-success); }
+.progress-next.tone-warn    .progress-next-fill { background: var(--c-waiting); }
+.progress-next.tone-danger  .progress-next-fill { background: var(--c-danger); }
+
+.progress-next.size-sm { height: 4px; }
+.progress-next.size-lg { height: 12px; }
+
+/* Step indicator (booking wizard, etc.) */
+.steps-next {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+}
+
+.steps-next-pill {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--bg-sunken);
+  transition: background var(--t-base) var(--ease-out);
+}
+
+.steps-next-pill.active { background: var(--brand); }
+.steps-next-pill.done   { background: color-mix(in oklab, var(--brand) 60%, var(--c-success) 40%); }

@@ -1,0 +1,48 @@
+/* Al Kokh — Modular Design System
+   Loaded AFTER index.css (which serves as the legacy layer).
+   These files layer on top with new tokens, components, and view redesigns. */
+
+/* === DESIGN TOKENS === */
+@import "./tokens/_reset.css";
+@import "./tokens/_variables.css";
+@import "./tokens/_themes.css";
+@import "./tokens/_typography.css";
+
+/* === BASE === */
+@import "./base/_layout.css";
+@import "./base/_scrollbar.css";
+@import "./base/_animations.css";
+@import "./base/_utilities.css";
+
+/* === COMPONENTS === */
+@import "./components/_button.css";
+@import "./components/_card.css";
+@import "./components/_badge.css";
+@import "./components/_input.css";
+@import "./components/_form.css";
+@import "./components/_stat-card.css";
+@import "./components/_order-card.css";
+@import "./components/_toast.css";
+@import "./components/_spinner.css";
+@import "./components/_modal.css";
+@import "./components/_empty-state.css";
+@import "./components/_theme-toggle.css";
+@import "./components/_leaderboard.css";
+@import "./components/_progress.css";
+@import "./components/_tab-filter.css";
+
+/* === LAYOUT === */
+@import "./layout/_nav.css";
+@import "./layout/_fullscreen-menu.css";
+@import "./layout/_page-header.css";
+@import "./layout/_background.css";
+
+/* === VIEWS (redesign overrides — applied last for priority) === */
+@import "./views/_login.css";
+@import "./views/_booking.css";
+@import "./views/_employee.css";
+@import "./views/_operator.css";
+@import "./views/_dashboard.css";
+
+/* === RESPONSIVE === */
+@import "./_responsive.css";

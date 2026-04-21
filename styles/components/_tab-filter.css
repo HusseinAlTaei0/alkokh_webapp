@@ -1,0 +1,77 @@
+/* ============================================================
+   TabFilter — segmented pill control (period filter, task tabs).
+   ============================================================ */
+
+.tab-filter-next {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-pill);
+}
+
+.tab-filter-next-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--fg-secondary);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 36px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  transition:
+    background var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.tab-filter-next-btn:hover {
+  color: var(--fg-primary);
+  background: color-mix(in oklab, var(--brand) 8%, transparent);
+}
+
+.tab-filter-next-btn.active,
+.tab-filter-next-btn[aria-pressed="true"] {
+  background: var(--bg-elevated);
+  color: var(--brand);
+  box-shadow: var(--sh-xs);
+}
+
+.tab-filter-next-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-ring-brand);
+}
+
+.tab-filter-next-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--brand) 12%, transparent);
+  color: var(--brand);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tab-filter-next-btn.active .tab-filter-next-count,
+.tab-filter-next-btn[aria-pressed="true"] .tab-filter-next-count {
+  background: var(--brand);
+  color: var(--gray-0);
+}
+
+@media (max-width: 480px) {
+  .tab-filter-next { width: 100%; }
+  .tab-filter-next-btn { flex: 1; justify-content: center; }
+}

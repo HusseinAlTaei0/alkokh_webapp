@@ -1,0 +1,71 @@
+/* ============================================================
+   Modal — centered dialog with backdrop. Optional; used for
+   confirmations (cancel/delete) where `confirm()` is not enough.
+   ============================================================ */
+
+.modal-next-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklab, var(--gray-1000) 60%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+  z-index: var(--z-modal);
+  animation: modal-next-fade var(--t-fast) var(--ease-out);
+}
+
+.modal-next {
+  width: min(480px, 100%);
+  max-height: calc(100dvh - var(--sp-10));
+  overflow: auto;
+  background: var(--bg-elevated);
+  color: var(--fg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-6);
+  animation: modal-next-in var(--t-base) var(--ease-spring);
+}
+
+.modal-next-title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  color: var(--fg-primary);
+  line-height: var(--lh-snug);
+}
+
+.modal-next-body {
+  font-size: var(--fs-md);
+  color: var(--fg-secondary);
+  line-height: var(--lh-normal);
+}
+
+.modal-next-actions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+  margin-top: var(--sp-2);
+}
+
+.modal-next-actions > .btn-next { min-width: 96px; }
+
+@keyframes modal-next-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-next-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 480px) {
+  .modal-next-actions { flex-direction: column-reverse; }
+  .modal-next-actions > .btn-next { width: 100%; }
+}

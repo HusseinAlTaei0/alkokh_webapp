@@ -1,0 +1,85 @@
+/* ============================================================
+   Leaderboard — employee workload ranking (Dashboard view).
+   Gold / silver / bronze rings on the top three rows.
+   ============================================================ */
+
+.leaderboard-next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 100%;
+}
+
+.leaderboard-next-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
+}
+
+.leaderboard-next-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--sh-sm);
+}
+
+.leaderboard-next-rank {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  background: var(--bg-sunken);
+  color: var(--fg-secondary);
+  border: 2px solid transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-next-row.rank-1 .leaderboard-next-rank {
+  background: color-mix(in oklab, #FFD700 30%, transparent);
+  border-color: #FFD700;
+  color: #8B6D00;
+}
+
+.leaderboard-next-row.rank-2 .leaderboard-next-rank {
+  background: color-mix(in oklab, #C0C0C0 30%, transparent);
+  border-color: #C0C0C0;
+  color: #5A5A5A;
+}
+
+.leaderboard-next-row.rank-3 .leaderboard-next-rank {
+  background: color-mix(in oklab, #CD7F32 30%, transparent);
+  border-color: #CD7F32;
+  color: #7A4A1E;
+}
+
+.leaderboard-next-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.leaderboard-next-name {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-next-count {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
