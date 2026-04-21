@@ -3650,27 +3650,49 @@ const MedicalIntakeView = {
         const qrTarget = patientId ? `patient/${patientId}` : (visit?.id ? `visit/${visit.id}` : '');
         const qrUrl = `${window.location.origin}${window.location.pathname}#${qrTarget}`;
         container.innerHTML = `
-          <div class="intake-success animate-in">
-            <div class="success-icon">✅</div>
-            <h1>تم إرسال طلبك بنجاح</h1>
-            <p class="success-message">سيتم توجيهك إلى الطبيب المختص خلال دقائق</p>
-            <p class="success-sub">راح تصلك رسالة واتساب بالتفاصيل على الرقم ${escHtml(phone)}</p>
+          <div class="qr-success-page animate-in">
+
+            <!-- Top: success message -->
+            <div class="qr-success-header">
+              <div class="qr-success-checkmark">
+                <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="26" cy="26" r="25" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                  <path d="M14 27l8 8 16-16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h1 class="qr-success-title">تم إرسال طلبك!</h1>
+              <p class="qr-success-sub">سيتم استدعاؤك خلال دقائق</p>
+              ${phone ? `<div class="qr-phone-badge">📱 ${escHtml(phone)}</div>` : ''}
+            </div>
 
             ${qrTarget ? `
-              <div class="qr-card">
-                <h3>📱 رمز QR الخاص بملفك</h3>
-                <p class="qr-hint">احتفظ بهذا الرمز — في زيارتك القادمة يمسحه الطبيب لعرض ملفك الطبي كاملاً</p>
-                <div id="patient-qr" class="qr-canvas"></div>
-                <div class="qr-actions">
-                  <button type="button" id="qr-download" class="btn btn-outline">⬇️ حفظ الصورة</button>
-                  <button type="button" id="qr-print" class="btn btn-outline">🖨️ طباعة</button>
-                </div>
+            <!-- QR Section -->
+            <div class="qr-glass-card">
+              <div class="qr-glass-card-label">
+                <span class="qr-label-dot"></span>
+                رمز ملفك الطبي
               </div>
+
+              <div class="qr-code-wrapper">
+                <div id="patient-qr" class="qr-canvas"></div>
+              </div>
+
+              <p class="qr-glass-hint">
+                📌 احتفظ بهذا الرمز — الطبيب يمسحه لعرض ملفك الطبي كاملاً في الزيارات القادمة
+              </p>
+
+              <div class="qr-glass-actions">
+                <button type="button" id="qr-download" class="qr-action-btn">
+                  <span>⬇️</span> حفظ
+                </button>
+                <button type="button" id="qr-print" class="qr-action-btn">
+                  <span>🖨️</span> طباعة
+                </button>
+              </div>
+            </div>
             ` : ''}
 
-            <div class="success-actions">
-              <a href="#home" class="btn btn-primary">العودة للرئيسية</a>
-            </div>
+            <a href="#home" class="qr-back-btn">← العودة للرئيسية</a>
           </div>
         `;
 
