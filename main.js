@@ -9,17 +9,36 @@
 // ==========================================
 const Auth = {
   _user: null,
+  _doctor: null, // populated when the logged-in user is a doctor
 
   async init() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    this._user = session?.user || null;
-    this._updateUI();
+    // Wait for Supabase client to be initialized
+    let attempts = 0;
+    while (!supabaseClient && attempts < 100) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      attempts++;
+    }
 
-    // Listen for auth state changes
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
+    if (!supabaseClient) {
+      console.error('❌ Supabase client initialization failed');
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
       this._user = session?.user || null;
+      await this._loadDoctor();
       this._updateUI();
-    });
+
+      // Listen for auth state changes
+      supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+        this._user = session?.user || null;
+        await this._loadDoctor();
+        this._updateUI();
+      });
+    } catch (err) {
+      console.error('❌ Auth initialization failed:', err);
+    }
   },
 
   async login(email, password) {
@@ -29,6 +48,7 @@ const Auth = {
     });
     if (error) throw error;
     this._user = data.user;
+    await this._loadDoctor();
     this._updateUI();
     return data;
   },
@@ -36,6 +56,7 @@ const Auth = {
   async logout() {
     await supabaseClient.auth.signOut();
     this._user = null;
+    this._doctor = null;
     this._updateUI();
   },
 
@@ -45,6 +66,41 @@ const Auth = {
 
   getUser() {
     return this._user;
+  },
+
+  getDoctor() {
+    return this._doctor;
+  },
+
+  isDoctor() {
+    return !!this._doctor && this._doctor.is_active !== false;
+  },
+
+  isClinicAdmin() {
+    return !!this._doctor && this._doctor.is_admin === true && this._doctor.is_active !== false;
+  },
+
+  async _loadDoctor() {
+    if (!this._user) {
+      this._doctor = null;
+      return;
+    }
+    try {
+      const { data, error } = await supabaseClient
+        .from('doctors')
+        .select('*')
+        .eq('auth_user_id', this._user.id)
+        .maybeSingle();
+      if (error) {
+        console.warn('Failed to load doctor profile:', error);
+        this._doctor = null;
+      } else {
+        this._doctor = data || null;
+      }
+    } catch (err) {
+      console.warn('Doctor profile lookup failed:', err);
+      this._doctor = null;
+    }
   },
 
   _updateUI() {
@@ -57,6 +113,16 @@ const Auth = {
     const locks = document.querySelectorAll('.menu-lock');
     locks.forEach(lock => {
       lock.style.display = this._user ? 'none' : 'inline';
+    });
+
+    // Show/hide doctor-only menu items
+    const doctorLinks = document.querySelectorAll('.menu-link[data-role="doctor"]');
+    doctorLinks.forEach(l => {
+      l.style.display = this.isDoctor() ? '' : 'none';
+    });
+    const adminLinks = document.querySelectorAll('.menu-link[data-role="clinic-admin"]');
+    adminLinks.forEach(l => {
+      l.style.display = this.isClinicAdmin() ? '' : 'none';
     });
   }
 };
@@ -521,7 +587,339 @@ const DB = {
   clearCache() {
     this._servicesCache = null;
     this._employeesCache = null;
-  }
+  },
+
+  // =========================================================
+  // ===== MEDICAL CLINIC — Doctors / Patients / Visits  =====
+  // =========================================================
+
+  // --- Doctors ---
+  async getDoctorByAuthId(uid) {
+    const { data, error } = await supabaseClient
+      .from('doctors').select('*').eq('auth_user_id', uid).maybeSingle();
+    if (error) { console.error(error); return null; }
+    return data;
+  },
+
+  async getAllDoctors() {
+    const { data, error } = await supabaseClient
+      .from('doctors').select('*').order('is_admin', { ascending: false }).order('display_name');
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+
+  async getActiveDoctors() {
+    const { data, error } = await supabaseClient
+      .from('doctors').select('*').eq('is_active', true).order('display_name');
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+
+  async toggleDoctorActive(id, isActive) {
+    const { error } = await supabaseClient
+      .from('doctors').update({ is_active: isActive }).eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  async createDoctor({ email, password, full_name, display_name, specialization, phone, is_admin, avatar_color, bio }) {
+    const { data, error } = await supabaseClient.functions.invoke('create-doctor', {
+      body: { email, password, full_name, display_name, specialization, phone, is_admin, avatar_color, bio }
+    });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+    return data?.doctor;
+  },
+
+  // --- Customers helper (reused from grooming) ---
+  async upsertCustomerByPhone({ name, phone }) {
+    // try find first
+    const { data: existing } = await supabaseClient
+      .from('customers').select('*').eq('phone', phone).maybeSingle();
+    if (existing) return existing;
+    const { data, error } = await supabaseClient
+      .from('customers').insert({ name, phone }).select().single();
+    if (error) { console.warn('customer insert failed:', error); return null; }
+    return data;
+  },
+
+  // --- Patients (animal files) ---
+  async findOrCreatePatient({ customer_id, name, animal_type, age_months, breed, gender }) {
+    if (customer_id) {
+      const { data: existing } = await supabaseClient
+        .from('patients').select('*')
+        .eq('customer_id', customer_id)
+        .eq('animal_type', animal_type)
+        .limit(1).maybeSingle();
+      if (existing) {
+        // optionally update name / age if provided
+        const updates = {};
+        if (name && !existing.name) updates.name = name;
+        if (age_months != null && existing.age_months == null) updates.age_months = age_months;
+        if (breed && !existing.breed) updates.breed = breed;
+        if (gender && !existing.gender) updates.gender = gender;
+        if (Object.keys(updates).length) {
+          updates.updated_at = new Date().toISOString();
+          await supabaseClient.from('patients').update(updates).eq('id', existing.id);
+        }
+        return existing;
+      }
+    }
+    const { data, error } = await supabaseClient.from('patients').insert({
+      customer_id, name, animal_type, age_months, breed, gender
+    }).select().single();
+    if (error) { console.error('patient insert failed:', error); throw error; }
+    return data;
+  },
+
+  async getPatient(id) {
+    const { data } = await supabaseClient.from('patients').select('*').eq('id', id).maybeSingle();
+    return data;
+  },
+
+  async updatePatient(id, fields) {
+    const { error } = await supabaseClient.from('patients')
+      .update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- Visits (clinical) ---
+  async createVisit({ customer_id, patient_id, intake, symptoms }) {
+    const { data, error } = await supabaseClient.from('visits').insert({
+      customer_id, patient_id,
+      status: 'waiting',
+      intake_customer_name: intake.customer_name,
+      intake_phone: intake.phone,
+      intake_area: intake.area || null,
+      intake_animal_type: intake.animal_type,
+      intake_animal_age: intake.animal_age || null,
+      intake_notes: intake.notes || null,
+    }).select().single();
+    if (error) throw error;
+
+    if (symptoms && symptoms.length) {
+      const rows = symptoms.map(s => ({ visit_id: data.id, symptom_key: s }));
+      const { error: symErr } = await supabaseClient.from('visit_symptoms').insert(rows);
+      if (symErr) console.warn('visit_symptoms insert failed:', symErr);
+    }
+    return data;
+  },
+
+  async getWaitingVisits() {
+    const { data, error } = await supabaseClient
+      .from('visits')
+      .select('*, visit_symptoms(symptom_key), patients(name, age_months, breed)')
+      .eq('status', 'waiting')
+      .order('created_at', { ascending: true });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+
+  async getMyVisits(doctorId) {
+    // visits where I'm primary OR I'm a collaborator
+    const { data: primary, error: e1 } = await supabaseClient
+      .from('visits')
+      .select('*, visit_symptoms(symptom_key), patients(name, age_months, breed), primary_doctor:doctors!visits_primary_doctor_id_fkey(display_name, full_name)')
+      .eq('primary_doctor_id', doctorId)
+      .order('created_at', { ascending: false });
+    if (e1) console.error(e1);
+    const { data: collabRows, error: e2 } = await supabaseClient
+      .from('visit_collaborators')
+      .select('visit_id')
+      .eq('doctor_id', doctorId);
+    if (e2) console.error(e2);
+    const collabIds = (collabRows || []).map(r => r.visit_id);
+    let collabVisits = [];
+    if (collabIds.length) {
+      const { data: cv } = await supabaseClient
+        .from('visits')
+        .select('*, visit_symptoms(symptom_key), patients(name, age_months, breed), primary_doctor:doctors!visits_primary_doctor_id_fkey(display_name, full_name)')
+        .in('id', collabIds);
+      collabVisits = cv || [];
+    }
+    const merged = [...(primary || []), ...collabVisits];
+    // dedupe
+    const seen = new Set();
+    return merged.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
+  },
+
+  async getVisitById(id) {
+    const { data, error } = await supabaseClient
+      .from('visits')
+      .select('*, visit_symptoms(symptom_key), patients(*), primary_doctor:doctors!visits_primary_doctor_id_fkey(*)')
+      .eq('id', id).maybeSingle();
+    if (error) { console.error(error); return null; }
+    return data;
+  },
+
+  async acceptVisit(visitId, doctorId) {
+    const { data, error } = await supabaseClient
+      .from('visits')
+      .update({
+        primary_doctor_id: doctorId,
+        status: 'in_progress',
+        accepted_at: new Date().toISOString(),
+      })
+      .eq('id', visitId)
+      .eq('status', 'waiting') // only if still waiting
+      .select().maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateVisit(id, fields) {
+    const { error } = await supabaseClient.from('visits').update(fields).eq('id', id);
+    if (error) throw error;
+  },
+
+  async completeVisit(id) {
+    const { error } = await supabaseClient.from('visits').update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async cancelVisit(id) {
+    const { error } = await supabaseClient.from('visits').update({
+      status: 'cancelled',
+    }).eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- Notes (timeline) ---
+  async addVisitNote(visitId, doctorId, note) {
+    const { data, error } = await supabaseClient
+      .from('visit_notes').insert({ visit_id: visitId, doctor_id: doctorId, note })
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getVisitNotes(visitId) {
+    const { data, error } = await supabaseClient
+      .from('visit_notes')
+      .select('*, doctor:doctors(display_name, avatar_color)')
+      .eq('visit_id', visitId)
+      .order('created_at', { ascending: false });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  },
+
+  // --- Collaborators (invited doctors) ---
+  async addCollaborator(visitId, doctorId, invitedBy) {
+    const { error } = await supabaseClient
+      .from('visit_collaborators')
+      .upsert({ visit_id: visitId, doctor_id: doctorId, invited_by: invitedBy }, { onConflict: 'visit_id,doctor_id' });
+    if (error) throw error;
+  },
+
+  async removeCollaborator(visitId, doctorId) {
+    const { error } = await supabaseClient
+      .from('visit_collaborators').delete()
+      .eq('visit_id', visitId).eq('doctor_id', doctorId);
+    if (error) throw error;
+  },
+
+  async getCollaborators(visitId) {
+    const { data } = await supabaseClient
+      .from('visit_collaborators')
+      .select('*, doctor:doctors(id, display_name, full_name, avatar_color)')
+      .eq('visit_id', visitId);
+    return data || [];
+  },
+
+  // --- Appointments (follow-up schedule) ---
+  async addAppointment({ visit_id, patient_id, scheduled_at, purpose, created_by }) {
+    const { data, error } = await supabaseClient
+      .from('visit_appointments')
+      .insert({ visit_id, patient_id, scheduled_at, purpose, created_by })
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getAppointmentsForVisit(visitId) {
+    const { data } = await supabaseClient
+      .from('visit_appointments').select('*')
+      .eq('visit_id', visitId)
+      .order('scheduled_at');
+    return data || [];
+  },
+
+  async markAppointmentAttended(id) {
+    const { error } = await supabaseClient
+      .from('visit_appointments')
+      .update({ status: 'attended', attended_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async cancelAppointment(id) {
+    const { error } = await supabaseClient
+      .from('visit_appointments').update({ status: 'cancelled' }).eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- Patient history (all visits for a patient) ---
+  async getPatientHistory(patientId) {
+    const { data } = await supabaseClient
+      .from('visits')
+      .select('id, status, created_at, diagnosis, treatment, severity, primary_doctor:doctors!visits_primary_doctor_id_fkey(display_name)')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false });
+    return data || [];
+  },
+
+  // --- Chat messages ---
+  async sendChatMessage(channel, content) {
+    const doctorId = Auth.getDoctor()?.id;
+    if (!doctorId) throw new Error('Not a doctor');
+    const { data, error } = await supabaseClient
+      .from('chat_messages')
+      .insert({ channel, content, sender_id: doctorId })
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getChatMessages(channel, limit = 100) {
+    const { data } = await supabaseClient
+      .from('chat_messages')
+      .select('*, sender:doctors!chat_messages_sender_id_fkey(id, display_name, avatar_color)')
+      .eq('channel', channel)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return (data || []).reverse(); // oldest first for UI
+  },
+
+  // --- Reports ---
+  async getReportStats(fromISO, toISO) {
+    const { data: visits } = await supabaseClient
+      .from('visits')
+      .select('id, status, severity, primary_doctor_id, intake_animal_type, created_at')
+      .gte('created_at', fromISO).lte('created_at', toISO);
+    const { data: syms } = await supabaseClient
+      .from('visit_symptoms')
+      .select('symptom_key, visit_id, visits!inner(created_at)')
+      .gte('visits.created_at', fromISO).lte('visits.created_at', toISO);
+    const { data: docs } = await supabaseClient.from('doctors').select('id, display_name, full_name');
+    return { visits: visits || [], syms: syms || [], doctors: docs || [] };
+  },
+
+  async getRecentAIReports(limit = 20) {
+    const { data } = await supabaseClient
+      .from('ai_reports')
+      .select('*, generated_by:doctors(display_name)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return data || [];
+  },
+
+  async getAIReport(id) {
+    const { data } = await supabaseClient.from('ai_reports').select('*, generated_by:doctors(display_name)').eq('id', id).maybeSingle();
+    return data;
+  },
 };
 
 
@@ -685,6 +1083,99 @@ const WhatsApp = {
 
 
 // ==========================================
+// ===== MEDICAL CLINIC — shared constants & modules =====
+// ==========================================
+
+// Canonical list of intake symptoms (key -> Arabic label)
+const SYMPTOMS = [
+  { key: 'vomit',              label: 'قيء',                   icon: '🤮' },
+  { key: 'diarrhea',           label: 'إسهال',                 icon: '💩' },
+  { key: 'appetite_loss',      label: 'انقطاع شهية',           icon: '🍽️' },
+  { key: 'fever',              label: 'ارتفاع درجة حرارة',     icon: '🌡️' },
+  { key: 'lethargy',           label: 'خمول',                  icon: '😴' },
+  { key: 'mobility_issue',     label: 'صعوبة حركة',            icon: '🦴' },
+  { key: 'urination_issue',    label: 'مشكلة بالإدرار',        icon: '💧' },
+  { key: 'defecation_issue',   label: 'مشكلة بالخروج',         icon: '🚽' },
+  { key: 'labor',              label: 'ولادة',                 icon: '🤰' },
+  { key: 'ultrasound',         label: 'سونار',                 icon: '📡' },
+  { key: 'lab_test',           label: 'فحص مختبري',           icon: '🧪' },
+];
+const SYMPTOM_LABEL = SYMPTOMS.reduce((acc, s) => { acc[s.key] = s.label; return acc; }, {});
+
+const ANIMAL_TYPES = ['قطة', 'كلب', 'طائر', 'أرنب', 'هامستر', 'زواحف', 'حيوان آخر'];
+
+// Realtime subscriptions manager
+const Realtime = {
+  _channels: {},
+
+  subscribe(name, tableConfig, callback) {
+    // tableConfig: { event: '*' | 'INSERT' | 'UPDATE' | 'DELETE', schema: 'public', table, filter? }
+    this.unsubscribe(name);
+    const ch = supabaseClient.channel(name)
+      .on('postgres_changes', tableConfig, callback)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log(`[Realtime] ${name} subscribed`);
+      });
+    this._channels[name] = ch;
+    return ch;
+  },
+
+  unsubscribe(name) {
+    const ch = this._channels[name];
+    if (ch) {
+      supabaseClient.removeChannel(ch);
+      delete this._channels[name];
+    }
+  },
+
+  unsubscribeAll() {
+    Object.keys(this._channels).forEach(n => this.unsubscribe(n));
+  }
+};
+
+// AI module — calls ai-assist Edge Function
+const AI = {
+  async suggestDiagnosis({ animal_type, age, symptoms, findings, history }) {
+    const { data, error } = await supabaseClient.functions.invoke('ai-assist', {
+      body: { mode: 'diagnose', payload: { animal_type, age, symptoms, findings, history } }
+    });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  },
+
+  async generateReport({ period_start, period_end, report_type }) {
+    const { data, error } = await supabaseClient.functions.invoke('ai-assist', {
+      body: { mode: 'report', payload: { period_start, period_end, report_type } }
+    });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  }
+};
+
+// Minimal markdown -> HTML renderer (safe-ish; sanitizes basic tags)
+function renderMarkdown(md) {
+  if (!md) return '';
+  // escape html
+  let s = md.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  // headings
+  s = s.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+  s = s.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+  // bold / italic
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  // lists
+  s = s.replace(/^(?:-|\*) (.*)$/gm, '<li>$1</li>');
+  s = s.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+  // paragraphs
+  s = s.split(/\n{2,}/).map(p => /^<(h\d|ul|ol|blockquote)/.test(p) ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join('\n');
+  return s;
+}
+
+
+// ==========================================
 // ROUTER & MENU
 // ==========================================
 const Router = {
@@ -726,20 +1217,30 @@ const Router = {
       logoutBtn.addEventListener('click', async () => {
         await Auth.logout();
         showToast('تم تسجيل الخروج بنجاح', 'info');
-        window.location.hash = '#booking';
+        Realtime.unsubscribeAll();
+        window.location.hash = '#home';
       });
     }
   },
 
   route() {
-    const hash = window.location.hash.replace('#', '') || 'booking';
+    const hash = window.location.hash.replace(/^#/, '') || 'home';
     this.navigate(hash);
   },
 
-  async navigate(view) {
-    // Check auth for protected routes (admin only)
-    if (view === 'operator' || view === 'dashboard') {
-      // Block employee PIN users from admin areas
+  async navigate(hash) {
+    // hash can contain slashes: "booking/medical", "doctor/visit/<id>"
+    const parts = hash.split('/').filter(Boolean);
+    const head = parts[0] || 'home';
+    const subPath = parts.slice(1);
+
+    // Clear any realtime subscriptions when navigating between top-level views
+    if (this.currentView !== head) {
+      Realtime.unsubscribeAll();
+    }
+
+    // --- Auth gates ---
+    if (head === 'operator' || head === 'dashboard') {
       const savedEmployee = sessionStorage.getItem('alkokh_employee');
       if (savedEmployee && !Auth.isAuthenticated()) {
         showToast('⛔ هذه الصفحة للإدارة فقط', 'warning');
@@ -748,23 +1249,58 @@ const Router = {
       }
       if (!Auth.isAuthenticated()) {
         this.currentView = 'login';
-        LoginView.render($('#app'), view);
+        LoginView.render($('#app'), head);
+        return;
+      }
+    }
+    if (head === 'doctor') {
+      if (!Auth.isAuthenticated()) {
+        this.currentView = 'login';
+        LoginView.render($('#app'), 'doctor');
+        return;
+      }
+      if (!Auth.isDoctor()) {
+        showToast('⛔ هذه الصفحة للأطباء فقط', 'warning');
+        window.location.hash = '#home';
+        return;
+      }
+    }
+    if (head === 'admin') {
+      if (!Auth.isAuthenticated()) {
+        this.currentView = 'login';
+        LoginView.render($('#app'), 'admin/doctors');
+        return;
+      }
+      if (!Auth.isClinicAdmin()) {
+        showToast('⛔ صلاحيات المدير مطلوبة', 'warning');
+        window.location.hash = '#doctor';
         return;
       }
     }
 
-    this.currentView = view;
+    this.currentView = head;
 
     // Remove active state from nav links
     $$('.nav-link').forEach(link => {
-      link.classList.toggle('active', link.dataset.view === view);
+      link.classList.toggle('active', link.dataset.view === head);
     });
 
     // Render view
     const app = $('#app');
 
-    switch (view) {
+    switch (head) {
+      case 'home':
+        await LandingView.render(app);
+        break;
       case 'booking':
+        if (subPath[0] === 'medical') {
+          await MedicalIntakeView.render(app);
+        } else {
+          // default booking = grooming (backward-compat for #booking bookmarks)
+          await BookingView.render(app);
+        }
+        break;
+      case 'grooming':
         await BookingView.render(app);
         break;
       case 'employee':
@@ -776,8 +1312,26 @@ const Router = {
       case 'dashboard':
         await DashboardView.render(app);
         break;
+      case 'doctor':
+        if (subPath[0] === 'visit' && subPath[1]) {
+          await DoctorVisitDetailView.render(app, subPath[1]);
+        } else if (subPath[0] === 'chat') {
+          await DoctorChatView.render(app);
+        } else if (subPath[0] === 'reports') {
+          await ReportsView.render(app);
+        } else {
+          await DoctorView.render(app);
+        }
+        break;
+      case 'admin':
+        if (subPath[0] === 'doctors') {
+          await AdminDoctorsView.render(app);
+        } else {
+          await LandingView.render(app);
+        }
+        break;
       default:
-        await BookingView.render(app);
+        await LandingView.render(app);
     }
   }
 };
@@ -2596,23 +3150,1125 @@ function initAnimatedBackground() {
 }
 
 
+// =============================================================
+// ===== MEDICAL CLINIC VIEWS (Landing / Medical / Doctor) =====
+// =============================================================
+
+// ---------- helpers for clinic UI ----------
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function formatDateTimeAr(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('ar-IQ', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+function formatRelativeAr(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'الآن';
+  if (mins < 60) return `قبل ${mins} دقيقة`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `قبل ${hrs} ساعة`;
+  const days = Math.floor(hrs / 24);
+  return `قبل ${days} يوم`;
+}
+function severityBadge(sev) {
+  const map = { low:{txt:'منخفضة',cls:'sev-low'}, medium:{txt:'متوسطة',cls:'sev-medium'}, high:{txt:'عالية',cls:'sev-high'}, critical:{txt:'حرجة',cls:'sev-critical'} };
+  const m = map[sev]; if (!m) return '';
+  return `<span class="sev-badge ${m.cls}">${m.txt}</span>`;
+}
+function statusLabel(status) {
+  return ({ waiting:'بانتظار القبول', in_progress:'قيد المعالجة', completed:'مكتملة', cancelled:'ملغاة' }[status] || status);
+}
+function playNotifSound() {
+  try { const a = document.getElementById('notification-sound'); if (a) { a.currentTime = 0; a.play().catch(() => {}); } } catch {}
+}
+
+
+// =============================================================
+// LANDING VIEW — two entry points (medical / grooming)
+// =============================================================
+const LandingView = {
+  async render(container) {
+    container.innerHTML = `
+      <div class="landing-view animate-in">
+        <div class="landing-hero">
+          <div class="landing-logo"><img src="assets/logo.svg" alt="الكوخ"></div>
+          <h1 class="landing-title">عيادة الكوخ البيطرية</h1>
+          <p class="landing-subtitle">اختر الخدمة المناسبة لحيوانك</p>
+        </div>
+        <div class="landing-cards">
+          <a href="#booking/medical" class="landing-card landing-card-medical">
+            <div class="landing-icon">🩺</div>
+            <h2>زيارة طبيب</h2>
+            <p>استشارة طبية، فحص، علاج ومتابعة</p>
+            <span class="landing-cta">ابدأ الحجز ←</span>
+          </a>
+          <a href="#grooming" class="landing-card landing-card-grooming">
+            <div class="landing-icon">✂️</div>
+            <h2>خدمات أخرى</h2>
+            <p>حلاقة وتحميم — عناية شاملة</p>
+            <span class="landing-cta">ابدأ الحجز ←</span>
+          </a>
+        </div>
+      </div>
+    `;
+  }
+};
+
+
+// =============================================================
+// MEDICAL INTAKE VIEW — public intake form
+// =============================================================
+const MedicalIntakeView = {
+  _selectedSymptoms: new Set(),
+
+  async render(container) {
+    this._selectedSymptoms = new Set();
+    container.innerHTML = `
+      <div class="intake-view animate-in">
+        <div class="intake-header">
+          <a href="#home" class="back-link">← عودة</a>
+          <h1>🩺 زيارة طبيب</h1>
+          <p>يرجى تعبئة البيانات ليتم توجيهك للطبيب المختص</p>
+        </div>
+
+        <form id="intake-form" class="intake-form" autocomplete="off">
+          <div class="form-grid">
+            <label class="form-field">
+              <span>الاسم الثلاثي <em>*</em></span>
+              <input type="text" name="customer_name" required placeholder="مثال: أحمد علي حسين">
+            </label>
+            <label class="form-field">
+              <span>رقم الهاتف <em>*</em></span>
+              <input type="tel" name="phone" required placeholder="07XXXXXXXXX" pattern="[0-9+\\- ]{8,15}">
+            </label>
+            <label class="form-field">
+              <span>المنطقة</span>
+              <input type="text" name="area" placeholder="مثال: الكرادة">
+            </label>
+            <label class="form-field">
+              <span>نوع الحيوان <em>*</em></span>
+              <select name="animal_type" required>
+                <option value="">اختر نوع الحيوان</option>
+                ${ANIMAL_TYPES.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('')}
+              </select>
+            </label>
+            <label class="form-field">
+              <span>عمر الحيوان</span>
+              <input type="text" name="animal_age" placeholder="مثال: سنتين أو 6 أشهر">
+            </label>
+            <label class="form-field">
+              <span>اسم الحيوان (اختياري)</span>
+              <input type="text" name="pet_name" placeholder="مثال: ماكس">
+            </label>
+          </div>
+
+          <div class="form-section">
+            <label class="form-label">الأعراض (اختر ما ينطبق)</label>
+            <div class="symptom-grid">
+              ${SYMPTOMS.map(s => `
+                <label class="symptom-chip" data-key="${s.key}">
+                  <input type="checkbox" value="${s.key}">
+                  <span class="symptom-icon">${s.icon}</span>
+                  <span class="symptom-label">${s.label}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="form-section">
+            <label class="form-field">
+              <span>ملاحظات إضافية</span>
+              <textarea name="notes" rows="3" placeholder="صف الحالة بتفصيل أكثر (اختياري)"></textarea>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg intake-submit">
+            <span>📨</span>
+            <span>إرسال الطلب</span>
+          </button>
+        </form>
+      </div>
+    `;
+
+    const form = $('#intake-form');
+    const chips = $$('.symptom-chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          const cb = chip.querySelector('input');
+          cb.checked = !cb.checked;
+        }
+        chip.classList.toggle('active', chip.querySelector('input').checked);
+      });
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const phone = String(fd.get('phone') || '').trim();
+      const customer_name = String(fd.get('customer_name') || '').trim();
+      const animal_type = String(fd.get('animal_type') || '').trim();
+      if (!phone || !customer_name || !animal_type) {
+        showToast('يرجى تعبئة الحقول المطلوبة', 'warning');
+        return;
+      }
+      const symptoms = Array.from(form.querySelectorAll('.symptom-chip input:checked')).map(i => i.value);
+      const pet_name = String(fd.get('pet_name') || '').trim();
+
+      const submitBtn = form.querySelector('.intake-submit');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳</span><span>جاري الإرسال...</span>';
+
+      try {
+        // 1. upsert customer
+        const customer = await DB.upsertCustomerByPhone({ name: customer_name, phone });
+        // 2. find/create patient (animal file)
+        const patient = await DB.findOrCreatePatient({
+          customer_id: customer?.id ?? null,
+          name: pet_name || null,
+          animal_type,
+        });
+        // 3. insert visit
+        const visit = await DB.createVisit({
+          customer_id: customer?.id ?? null,
+          patient_id: patient?.id ?? null,
+          intake: {
+            customer_name,
+            phone,
+            area: fd.get('area') || '',
+            animal_type,
+            animal_age: fd.get('animal_age') || '',
+            notes: fd.get('notes') || '',
+          },
+          symptoms,
+        });
+        // 4. send whatsapp confirmation
+        WhatsApp.sendViaEdgeFunction({
+          phone,
+          customerName: customer_name,
+          serviceName: 'استشارة طبية',
+          petName: pet_name || animal_type,
+          eventType: 'intake_received',
+          orderId: null,
+        }).catch(err => console.warn('intake whatsapp failed:', err));
+
+        // success screen
+        container.innerHTML = `
+          <div class="intake-success animate-in">
+            <div class="success-icon">✅</div>
+            <h1>تم إرسال طلبك بنجاح</h1>
+            <p class="success-message">سيتم توجيهك إلى الطبيب المختص خلال دقائق</p>
+            <p class="success-sub">راح تصلك رسالة واتساب بالتفاصيل على الرقم ${escHtml(phone)}</p>
+            <div class="success-actions">
+              <a href="#home" class="btn btn-primary">العودة للرئيسية</a>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        console.error('Intake submit failed:', err);
+        showToast(`❌ فشل إرسال الطلب: ${err?.message || 'خطأ غير معروف'}`, 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>📨</span><span>إرسال الطلب</span>';
+      }
+    });
+  }
+};
+
+
+// =============================================================
+// DOCTOR VIEW — doctor portal dashboard
+// =============================================================
+const DoctorView = {
+  _tab: 'waiting',
+
+  async render(container) {
+    const doctor = Auth.getDoctor();
+    if (!doctor) {
+      container.innerHTML = `<div class="empty-state">⛔ غير مصرح</div>`;
+      return;
+    }
+    container.innerHTML = `
+      <div class="doctor-view animate-in">
+        <div class="doctor-header">
+          <div class="doctor-header-main">
+            <div class="doctor-avatar" style="background:${escHtml(doctor.avatar_color || '#7c3aed')}">${escHtml((doctor.display_name || 'د').slice(0,1))}</div>
+            <div>
+              <h1>مرحباً د. ${escHtml(doctor.display_name)}${doctor.is_admin ? ' <span class="admin-badge">مدير</span>' : ''}</h1>
+              <p>${escHtml(doctor.specialization || 'طبيب بيطري')}</p>
+            </div>
+          </div>
+          <div class="doctor-header-actions">
+            <a href="#doctor/chat" class="btn btn-ghost">💬 الچات</a>
+            <a href="#doctor/reports" class="btn btn-ghost">📊 التقارير</a>
+            ${doctor.is_admin ? '<a href="#admin/doctors" class="btn btn-ghost">👨‍⚕️ الأطباء</a>' : ''}
+          </div>
+        </div>
+
+        <div class="doctor-tabs">
+          <button class="doctor-tab ${this._tab === 'waiting' ? 'active' : ''}" data-tab="waiting">⏳ الحالات المعلقة <span id="waiting-count" class="tab-count">0</span></button>
+          <button class="doctor-tab ${this._tab === 'mine' ? 'active' : ''}" data-tab="mine">👨‍⚕️ حالاتي <span id="mine-count" class="tab-count">0</span></button>
+        </div>
+
+        <div id="doctor-cases" class="doctor-cases"></div>
+      </div>
+    `;
+
+    $$('.doctor-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._tab = btn.dataset.tab;
+        $$('.doctor-tab').forEach(b => b.classList.toggle('active', b === btn));
+        this._loadCases();
+      });
+    });
+
+    await this._loadCases();
+
+    // realtime: listen for new visits & status changes
+    Realtime.subscribe('doctor-visits', { event: '*', schema: 'public', table: 'visits' }, async (payload) => {
+      // notify on new incoming patients (INSERT with status=waiting)
+      if (payload.eventType === 'INSERT' && payload.new?.status === 'waiting') {
+        playNotifSound();
+        showToast(`🚨 مريض جديد: ${payload.new.intake_customer_name} (${payload.new.intake_animal_type})`, 'info', 6000);
+      }
+      await this._loadCases();
+    });
+  },
+
+  async _loadCases() {
+    const doctorId = Auth.getDoctor()?.id;
+    const pane = $('#doctor-cases');
+    if (!pane) return;
+    pane.innerHTML = '<div class="loading-spinner"></div>';
+
+    let visits = [];
+    if (this._tab === 'waiting') {
+      visits = await DB.getWaitingVisits();
+    } else {
+      visits = await DB.getMyVisits(doctorId);
+    }
+
+    const waitingCount = this._tab === 'waiting' ? visits.length : (await DB.getWaitingVisits()).length;
+    const mineCount = this._tab === 'mine' ? visits.length : (await DB.getMyVisits(doctorId)).length;
+    const wc = $('#waiting-count'); if (wc) wc.textContent = waitingCount;
+    const mc = $('#mine-count'); if (mc) mc.textContent = mineCount;
+
+    if (!visits.length) {
+      pane.innerHTML = `<div class="empty-state">لا توجد حالات ${this._tab === 'waiting' ? 'معلقة' : 'مسجلة لك'}.</div>`;
+      return;
+    }
+
+    pane.innerHTML = visits.map(v => {
+      const symptoms = (v.visit_symptoms || []).map(s => SYMPTOM_LABEL[s.symptom_key] || s.symptom_key).join('، ');
+      const pet = v.patients?.name || v.intake_animal_type;
+      const primaryDocName = v.primary_doctor?.display_name ? `د. ${v.primary_doctor.display_name}` : '';
+      return `
+        <div class="case-card status-${v.status}">
+          <div class="case-card-header">
+            <div>
+              <h3>${escHtml(v.intake_customer_name)}</h3>
+              <div class="case-meta">
+                <span>📞 ${escHtml(v.intake_phone)}</span>
+                ${v.intake_area ? `<span>📍 ${escHtml(v.intake_area)}</span>` : ''}
+                <span>🐾 ${escHtml(pet)}${v.intake_animal_age ? ` · ${escHtml(v.intake_animal_age)}` : ''}</span>
+              </div>
+            </div>
+            <div class="case-card-status">
+              <span class="status-pill status-${v.status}">${statusLabel(v.status)}</span>
+              ${severityBadge(v.severity)}
+              <small>${formatRelativeAr(v.created_at)}</small>
+            </div>
+          </div>
+          ${symptoms ? `<div class="case-symptoms"><strong>الأعراض:</strong> ${escHtml(symptoms)}</div>` : ''}
+          ${primaryDocName ? `<div class="case-doctor">الطبيب المعالج: ${escHtml(primaryDocName)}</div>` : ''}
+          <div class="case-actions">
+            ${v.status === 'waiting'
+              ? `<button class="btn btn-primary" data-accept-id="${v.id}">قبول الحالة</button>`
+              : ''}
+            <a href="#doctor/visit/${v.id}" class="btn btn-ghost">فتح الحالة ←</a>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // wire accept buttons
+    pane.querySelectorAll('[data-accept-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const visitId = btn.dataset.acceptId;
+        btn.disabled = true;
+        btn.textContent = 'جاري القبول...';
+        try {
+          const accepted = await DB.acceptVisit(visitId, Auth.getDoctor().id);
+          if (!accepted) {
+            showToast('الحالة قُبِلت من طبيب آخر', 'warning');
+            await this._loadCases();
+            return;
+          }
+          // notify customer
+          const visit = await DB.getVisitById(visitId);
+          WhatsApp.sendViaEdgeFunction({
+            phone: visit.intake_phone,
+            customerName: visit.intake_customer_name,
+            serviceName: `استلم حالتك د. ${Auth.getDoctor().display_name}`,
+            petName: visit.patients?.name || visit.intake_animal_type,
+            eventType: 'doctor_patient_accepted',
+            orderId: null,
+          }).catch(() => {});
+          showToast('✅ تم قبول الحالة', 'success');
+          window.location.hash = `#doctor/visit/${visitId}`;
+        } catch (err) {
+          showToast(`❌ ${err.message || 'فشل قبول الحالة'}`, 'error');
+          btn.disabled = false;
+          btn.textContent = 'قبول الحالة';
+        }
+      });
+    });
+  }
+};
+
+
+// =============================================================
+// DOCTOR VISIT DETAIL VIEW — full case management
+// =============================================================
+const DoctorVisitDetailView = {
+  _visitId: null,
+
+  async render(container, visitId) {
+    this._visitId = visitId;
+    const doctor = Auth.getDoctor();
+    container.innerHTML = '<div class="loading-spinner"></div>';
+
+    const visit = await DB.getVisitById(visitId);
+    if (!visit) {
+      container.innerHTML = `<div class="empty-state">الحالة غير موجودة.</div>`;
+      return;
+    }
+
+    const [notes, appointments, collaborators, allDoctors, history] = await Promise.all([
+      DB.getVisitNotes(visitId),
+      DB.getAppointmentsForVisit(visitId),
+      DB.getCollaborators(visitId),
+      DB.getActiveDoctors(),
+      visit.patient_id ? DB.getPatientHistory(visit.patient_id) : Promise.resolve([]),
+    ]);
+
+    const pastVisits = (history || []).filter(h => h.id !== visit.id);
+    const symptoms = (visit.visit_symptoms || []).map(s => SYMPTOM_LABEL[s.symptom_key] || s.symptom_key);
+    const isPrimary = visit.primary_doctor_id === doctor?.id;
+    const isCollab = collaborators.some(c => c.doctor_id === doctor?.id);
+    const canEdit = isPrimary || isCollab || doctor?.is_admin;
+
+    container.innerHTML = `
+      <div class="visit-detail animate-in">
+        <div class="visit-back"><a href="#doctor" class="back-link">← عودة للحالات</a></div>
+
+        <div class="visit-header">
+          <div>
+            <h1>ملف الحالة</h1>
+            <div class="visit-meta">
+              <span class="status-pill status-${visit.status}">${statusLabel(visit.status)}</span>
+              ${severityBadge(visit.severity)}
+              <small>${formatDateTimeAr(visit.created_at)}</small>
+            </div>
+          </div>
+          <div class="visit-header-actions">
+            ${visit.status === 'in_progress' && canEdit ? `<button class="btn btn-success" id="complete-visit-btn">✅ إنهاء الحالة</button>` : ''}
+            ${visit.status === 'waiting' ? `<button class="btn btn-primary" id="accept-visit-btn">قبول الحالة</button>` : ''}
+          </div>
+        </div>
+
+        <div class="visit-grid">
+          <!-- Patient info card -->
+          <section class="visit-card">
+            <h2>🐾 معلومات المريض</h2>
+            <div class="info-row"><strong>الزبون:</strong> ${escHtml(visit.intake_customer_name)}</div>
+            <div class="info-row"><strong>الهاتف:</strong> ${escHtml(visit.intake_phone)}</div>
+            <div class="info-row"><strong>المنطقة:</strong> ${escHtml(visit.intake_area || '—')}</div>
+            <div class="info-row"><strong>الحيوان:</strong> ${escHtml(visit.patients?.name || '—')} (${escHtml(visit.intake_animal_type)})</div>
+            <div class="info-row"><strong>العمر:</strong> ${escHtml(visit.intake_animal_age || '—')}</div>
+            ${symptoms.length ? `<div class="info-row"><strong>الأعراض:</strong> ${escHtml(symptoms.join('، '))}</div>` : ''}
+            ${visit.intake_notes ? `<div class="info-row"><strong>ملاحظات المريض:</strong> ${escHtml(visit.intake_notes)}</div>` : ''}
+          </section>
+
+          <!-- Past visits (patient history) -->
+          <section class="visit-card">
+            <h2>📜 تاريخ المريض</h2>
+            ${pastVisits.length === 0 ? `<p class="muted">لا يوجد زيارات سابقة لهذا الحيوان.</p>` : `
+              <ul class="history-list">
+                ${pastVisits.slice(0, 8).map(h => `
+                  <li>
+                    <div class="history-date">${formatDateTimeAr(h.created_at)}</div>
+                    <div><strong>التشخيص:</strong> ${escHtml(h.diagnosis || '—')}</div>
+                    <div><strong>العلاج:</strong> ${escHtml(h.treatment || '—')}</div>
+                    ${h.primary_doctor?.display_name ? `<div class="muted">د. ${escHtml(h.primary_doctor.display_name)}</div>` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            `}
+          </section>
+
+          <!-- Exam form -->
+          <section class="visit-card visit-exam" style="grid-column: 1 / -1;">
+            <h2>🔬 فورم الفحص والتشخيص</h2>
+            <form id="exam-form" ${canEdit ? '' : 'data-readonly="1"'}>
+              <div class="form-grid">
+                <label class="form-field"><span>درجة الحرارة (°C)</span><input type="number" step="0.1" name="vital_temperature" value="${visit.vital_temperature ?? ''}"></label>
+                <label class="form-field"><span>الوزن (kg)</span><input type="number" step="0.1" name="vital_weight_kg" value="${visit.vital_weight_kg ?? ''}"></label>
+                <label class="form-field"><span>معدل النبض</span><input type="number" name="vital_heart_rate" value="${visit.vital_heart_rate ?? ''}"></label>
+                <label class="form-field">
+                  <span>درجة الخطورة</span>
+                  <select name="severity">
+                    <option value="">—</option>
+                    <option value="low" ${visit.severity === 'low' ? 'selected':''}>منخفضة</option>
+                    <option value="medium" ${visit.severity === 'medium' ? 'selected':''}>متوسطة</option>
+                    <option value="high" ${visit.severity === 'high' ? 'selected':''}>عالية</option>
+                    <option value="critical" ${visit.severity === 'critical' ? 'selected':''}>حرجة</option>
+                  </select>
+                </label>
+              </div>
+              <label class="form-field"><span>التشخيص</span><textarea name="diagnosis" rows="2">${escHtml(visit.diagnosis || '')}</textarea></label>
+              <label class="form-field"><span>العلاج</span><textarea name="treatment" rows="2">${escHtml(visit.treatment || '')}</textarea></label>
+              <label class="form-field"><span>الوصفة الطبية</span><textarea name="prescription" rows="2">${escHtml(visit.prescription || '')}</textarea></label>
+              <label class="form-field"><span>نتائج مختبرية</span><textarea name="lab_results" rows="2">${escHtml(visit.lab_results || '')}</textarea></label>
+              ${canEdit ? `
+                <div class="exam-actions">
+                  <button type="button" class="btn btn-ghost" id="ai-suggest-btn">💡 اقترح تشخيص بالذكاء الصناعي</button>
+                  <button type="submit" class="btn btn-primary">💾 حفظ</button>
+                </div>
+              ` : '<p class="muted">عرض فقط (لست من الأطباء المسموح لهم بتعديل هذه الحالة).</p>'}
+            </form>
+            <div id="ai-result" class="ai-result" style="display:none;"></div>
+          </section>
+
+          <!-- Notes timeline -->
+          <section class="visit-card">
+            <h2>📝 الملاحظات الزمنية</h2>
+            ${canEdit ? `
+              <form id="add-note-form" class="note-form">
+                <textarea name="note" rows="2" placeholder="أضف ملاحظة..."></textarea>
+                <button type="submit" class="btn btn-sm btn-primary">إضافة</button>
+              </form>
+            ` : ''}
+            <ul id="notes-list" class="notes-list">
+              ${notes.map(n => `
+                <li>
+                  <div class="note-header">
+                    <span class="note-author" style="background:${escHtml(n.doctor?.avatar_color || '#7c3aed')}">${escHtml((n.doctor?.display_name || '؟').slice(0,1))}</span>
+                    <span>${escHtml(n.doctor?.display_name || '—')}</span>
+                    <small>${formatRelativeAr(n.created_at)}</small>
+                  </div>
+                  <div class="note-body">${escHtml(n.note)}</div>
+                </li>
+              `).join('') || '<li class="muted">لا توجد ملاحظات بعد.</li>'}
+            </ul>
+          </section>
+
+          <!-- Appointments -->
+          <section class="visit-card">
+            <h2>📅 مواعيد المتابعة</h2>
+            ${canEdit ? `
+              <form id="add-appt-form" class="appt-form">
+                <label class="form-field"><span>التاريخ والوقت</span><input type="datetime-local" name="scheduled_at" required></label>
+                <label class="form-field"><span>الغرض (اختياري)</span><input type="text" name="purpose" placeholder="متابعة، فحص، إلخ"></label>
+                <button type="submit" class="btn btn-sm btn-primary">➕ جدولة موعد</button>
+              </form>
+            ` : ''}
+            <ul id="appt-list" class="appt-list">
+              ${appointments.map(a => `
+                <li class="appt-item appt-status-${a.status}">
+                  <div>
+                    <strong>${formatDateTimeAr(a.scheduled_at)}</strong>
+                    ${a.purpose ? ` — ${escHtml(a.purpose)}` : ''}
+                    <span class="appt-status-pill">${({pending:'معلق',reminded:'تم التذكير',attended:'حضر',missed:'فوّت',cancelled:'ملغى'}[a.status]||a.status)}</span>
+                  </div>
+                  ${canEdit && a.status !== 'attended' && a.status !== 'cancelled' ? `
+                    <div class="appt-actions">
+                      <button class="btn btn-sm btn-success" data-attend="${a.id}">✓ حضر</button>
+                      <button class="btn btn-sm btn-ghost" data-cancel="${a.id}">إلغاء</button>
+                    </div>
+                  ` : ''}
+                </li>
+              `).join('') || '<li class="muted">لا توجد مواعيد مجدولة.</li>'}
+            </ul>
+          </section>
+
+          <!-- Collaborators -->
+          <section class="visit-card">
+            <h2>👥 الأطباء المشاركون</h2>
+            ${canEdit ? `
+              <form id="add-collab-form" class="collab-form">
+                <select name="doctor_id" required>
+                  <option value="">اختر طبيب للمساعدة</option>
+                  ${allDoctors.filter(d => d.id !== visit.primary_doctor_id && !collaborators.some(c => c.doctor_id === d.id)).map(d => `<option value="${d.id}">د. ${escHtml(d.display_name)} (${escHtml(d.specialization || 'عام')})</option>`).join('')}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">+ دعوة</button>
+              </form>
+            ` : ''}
+            <ul class="collab-list">
+              ${visit.primary_doctor ? `<li><strong>د. ${escHtml(visit.primary_doctor.display_name)}</strong> <small>(الطبيب الأساسي)</small></li>` : ''}
+              ${collaborators.map(c => `<li>د. ${escHtml(c.doctor?.display_name)} <small>(مساعد)</small>${canEdit && c.doctor?.id !== doctor.id ? ` <button class="btn-tiny" data-remove-collab="${c.doctor_id}">✕</button>` : ''}</li>`).join('')}
+            </ul>
+          </section>
+        </div>
+      </div>
+    `;
+
+    this._wireDetailEvents(visit, doctor, canEdit);
+  },
+
+  _wireDetailEvents(visit, doctor, canEdit) {
+    // accept button (rare case — loaded detail of a still-waiting visit)
+    const acceptBtn = document.getElementById('accept-visit-btn');
+    if (acceptBtn) {
+      acceptBtn.addEventListener('click', async () => {
+        try {
+          await DB.acceptVisit(visit.id, doctor.id);
+          showToast('✅ تم قبول الحالة', 'success');
+          Router.navigate(`doctor/visit/${visit.id}`);
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+
+    const completeBtn = document.getElementById('complete-visit-btn');
+    if (completeBtn) {
+      completeBtn.addEventListener('click', async () => {
+        if (!confirm('هل أنت متأكد من إنهاء الحالة؟')) return;
+        try {
+          await DB.completeVisit(visit.id);
+          showToast('✅ تم إنهاء الحالة', 'success');
+          Router.navigate(`doctor/visit/${visit.id}`);
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+
+    if (!canEdit) return;
+
+    // exam form save
+    const examForm = document.getElementById('exam-form');
+    if (examForm) {
+      examForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(examForm);
+        const fields = {
+          vital_temperature: fd.get('vital_temperature') ? parseFloat(fd.get('vital_temperature')) : null,
+          vital_weight_kg: fd.get('vital_weight_kg') ? parseFloat(fd.get('vital_weight_kg')) : null,
+          vital_heart_rate: fd.get('vital_heart_rate') ? parseInt(fd.get('vital_heart_rate')) : null,
+          severity: fd.get('severity') || null,
+          diagnosis: fd.get('diagnosis') || null,
+          treatment: fd.get('treatment') || null,
+          prescription: fd.get('prescription') || null,
+          lab_results: fd.get('lab_results') || null,
+        };
+        try {
+          await DB.updateVisit(visit.id, fields);
+          showToast('✅ تم الحفظ', 'success');
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+
+    // AI suggest
+    const aiBtn = document.getElementById('ai-suggest-btn');
+    if (aiBtn) {
+      aiBtn.addEventListener('click', async () => {
+        const fd = new FormData(examForm);
+        const symptoms = (visit.visit_symptoms || []).map(s => s.symptom_key);
+        const findings = [
+          fd.get('vital_temperature') ? `حرارة: ${fd.get('vital_temperature')}°C` : '',
+          fd.get('vital_weight_kg') ? `وزن: ${fd.get('vital_weight_kg')}kg` : '',
+          fd.get('vital_heart_rate') ? `نبض: ${fd.get('vital_heart_rate')}` : '',
+          fd.get('lab_results') ? `نتائج: ${fd.get('lab_results')}` : '',
+        ].filter(Boolean).join('؛ ');
+
+        const history = visit.patient_id ? await DB.getPatientHistory(visit.patient_id) : [];
+
+        aiBtn.disabled = true;
+        aiBtn.textContent = '⏳ يحلل الذكاء الصناعي...';
+        const resultBox = document.getElementById('ai-result');
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = '<div class="loading-spinner"></div>';
+        try {
+          const result = await AI.suggestDiagnosis({
+            animal_type: visit.intake_animal_type,
+            age: visit.intake_animal_age,
+            symptoms,
+            findings,
+            history: history.filter(h => h.id !== visit.id).slice(0, 5),
+          });
+          const p = result.parsed;
+          let html = `<div class="ai-box">
+            <h3>💡 اقتراحات الذكاء الصناعي</h3>`;
+          if (p?.differential_diagnoses?.length) {
+            html += `<div class="ai-section"><h4>التشخيصات التفاضلية:</h4><ol>${p.differential_diagnoses.map(d => `<li><strong>${escHtml(d.name)}</strong> <span class="likelihood">(${escHtml(d.likelihood)})</span><br><small>${escHtml(d.reasoning || '')}</small></li>`).join('')}</ol></div>`;
+          }
+          if (p?.recommended_tests?.length) {
+            html += `<div class="ai-section"><h4>الفحوصات الموصى بها:</h4><ul>${p.recommended_tests.map(t => `<li>${escHtml(t)}</li>`).join('')}</ul></div>`;
+          }
+          if (p?.initial_treatment) {
+            html += `<div class="ai-section"><h4>العلاج الأولي:</h4><p>${escHtml(p.initial_treatment)}</p></div>`;
+          }
+          if (p?.red_flags?.length) {
+            html += `<div class="ai-section red-flags"><h4>⚠️ علامات تحذيرية:</h4><ul>${p.red_flags.map(r => `<li>${escHtml(r)}</li>`).join('')}</ul></div>`;
+          }
+          if (!p) {
+            html += `<pre class="ai-raw">${escHtml(result.raw || '')}</pre>`;
+          }
+          html += `<p class="ai-disclaimer">${escHtml(result.disclaimer || '')}</p></div>`;
+          resultBox.innerHTML = html;
+        } catch (err) {
+          resultBox.innerHTML = `<div class="ai-error">❌ ${escHtml(err.message || 'فشل الاستدعاء')}</div>`;
+        }
+        aiBtn.disabled = false;
+        aiBtn.textContent = '💡 اقترح تشخيص بالذكاء الصناعي';
+      });
+    }
+
+    // add note
+    const noteForm = document.getElementById('add-note-form');
+    if (noteForm) {
+      noteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(noteForm);
+        const note = String(fd.get('note') || '').trim();
+        if (!note) return;
+        try {
+          await DB.addVisitNote(visit.id, doctor.id, note);
+          noteForm.reset();
+          Router.navigate(`doctor/visit/${visit.id}`);
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+
+    // add appointment
+    const apptForm = document.getElementById('add-appt-form');
+    if (apptForm) {
+      apptForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(apptForm);
+        const scheduledLocal = fd.get('scheduled_at');
+        if (!scheduledLocal) return;
+        const scheduled_at = new Date(scheduledLocal).toISOString();
+        try {
+          await DB.addAppointment({
+            visit_id: visit.id,
+            patient_id: visit.patient_id,
+            scheduled_at,
+            purpose: fd.get('purpose') || null,
+            created_by: doctor.id,
+          });
+          apptForm.reset();
+          showToast('✅ تم جدولة الموعد', 'success');
+          Router.navigate(`doctor/visit/${visit.id}`);
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+
+    // appt actions (attend / cancel)
+    document.querySelectorAll('[data-attend]').forEach(b => b.addEventListener('click', async () => {
+      try { await DB.markAppointmentAttended(b.dataset.attend); Router.navigate(`doctor/visit/${visit.id}`); } catch (err) { showToast(err.message, 'error'); }
+    }));
+    document.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('إلغاء هذا الموعد؟')) return;
+      try { await DB.cancelAppointment(b.dataset.cancel); Router.navigate(`doctor/visit/${visit.id}`); } catch (err) { showToast(err.message, 'error'); }
+    }));
+
+    // collaborators
+    const collabForm = document.getElementById('add-collab-form');
+    if (collabForm) {
+      collabForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(collabForm);
+        const doctorId = fd.get('doctor_id');
+        if (!doctorId) return;
+        try {
+          await DB.addCollaborator(visit.id, doctorId, doctor.id);
+          showToast('✅ تمت دعوة الطبيب', 'success');
+          Router.navigate(`doctor/visit/${visit.id}`);
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    }
+    document.querySelectorAll('[data-remove-collab]').forEach(b => b.addEventListener('click', async () => {
+      try { await DB.removeCollaborator(visit.id, b.dataset.removeCollab); Router.navigate(`doctor/visit/${visit.id}`); } catch (err) { showToast(err.message, 'error'); }
+    }));
+  }
+};
+
+
+// =============================================================
+// DOCTOR CHAT VIEW — team chat (realtime)
+// =============================================================
+const DoctorChatView = {
+  async render(container) {
+    const doctor = Auth.getDoctor();
+    if (!doctor) return;
+
+    container.innerHTML = `
+      <div class="chat-view animate-in">
+        <div class="chat-header">
+          <a href="#doctor" class="back-link">← عودة</a>
+          <h1>💬 چات الفريق</h1>
+          <p>تواصل مباشر بين الأطباء</p>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <form id="chat-form" class="chat-form">
+          <input type="text" name="content" placeholder="اكتب رسالة..." autocomplete="off" required>
+          <button type="submit" class="btn btn-primary">إرسال</button>
+        </form>
+      </div>
+    `;
+
+    const messagesBox = $('#chat-messages');
+
+    const renderMsg = (m) => {
+      const mine = m.sender?.id === doctor.id || m.sender_id === doctor.id;
+      const senderName = m.sender?.display_name || '؟';
+      const color = m.sender?.avatar_color || '#7c3aed';
+      return `
+        <div class="chat-msg ${mine ? 'chat-mine' : ''}">
+          <span class="chat-avatar" style="background:${escHtml(color)}">${escHtml(senderName.slice(0,1))}</span>
+          <div class="chat-bubble">
+            <div class="chat-sender">${escHtml(senderName)}</div>
+            <div class="chat-content">${escHtml(m.content)}</div>
+            <small class="chat-time">${formatRelativeAr(m.created_at)}</small>
+          </div>
+        </div>
+      `;
+    };
+
+    const initial = await DB.getChatMessages('general', 100);
+    messagesBox.innerHTML = initial.map(renderMsg).join('') || '<div class="empty-state">لا توجد رسائل بعد. ابدأ الحوار!</div>';
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+
+    // realtime
+    Realtime.subscribe('chat-general', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'channel=eq.general' }, async (payload) => {
+      // fetch the sender info
+      const { data } = await supabaseClient
+        .from('chat_messages')
+        .select('*, sender:doctors!chat_messages_sender_id_fkey(id, display_name, avatar_color)')
+        .eq('id', payload.new.id).maybeSingle();
+      if (!data) return;
+      messagesBox.insertAdjacentHTML('beforeend', renderMsg(data));
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    });
+
+    const form = $('#chat-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = form.querySelector('input[name="content"]');
+      const content = input.value.trim();
+      if (!content) return;
+      input.value = '';
+      try {
+        await DB.sendChatMessage('general', content);
+      } catch (err) {
+        showToast(err.message, 'error');
+        input.value = content;
+      }
+    });
+  }
+};
+
+
+// =============================================================
+// REPORTS VIEW — statistics + AI-generated reports
+// =============================================================
+const ReportsView = {
+  _period: 'month',
+
+  async render(container) {
+    container.innerHTML = `
+      <div class="reports-view animate-in">
+        <div class="reports-header">
+          <a href="#doctor" class="back-link">← عودة</a>
+          <h1>📊 تقارير العيادة</h1>
+        </div>
+        <div class="period-filter">
+          <button class="period-btn ${this._period === 'day' ? 'active' : ''}" data-period="day">اليوم</button>
+          <button class="period-btn ${this._period === 'week' ? 'active' : ''}" data-period="week">الأسبوع</button>
+          <button class="period-btn ${this._period === 'month' ? 'active' : ''}" data-period="month">الشهر</button>
+          <button class="period-btn ${this._period === 'year' ? 'active' : ''}" data-period="year">السنة</button>
+        </div>
+        <div id="stats-panel" class="stats-panel"></div>
+        <div class="reports-actions">
+          <button id="generate-ai-report" class="btn btn-primary">📊 ولّد تقرير بالذكاء الصناعي</button>
+        </div>
+        <div id="ai-report-output" class="ai-report-output" style="display:none;"></div>
+        <div class="saved-reports">
+          <h2>📁 التقارير المحفوظة</h2>
+          <div id="saved-list"></div>
+        </div>
+      </div>
+    `;
+
+    $$('.period-btn').forEach(b => b.addEventListener('click', async () => {
+      this._period = b.dataset.period;
+      $$('.period-btn').forEach(x => x.classList.toggle('active', x === b));
+      await this._loadStats();
+    }));
+
+    $('#generate-ai-report').addEventListener('click', () => this._generateAIReport());
+
+    await this._loadStats();
+    await this._loadSavedReports();
+  },
+
+  _getPeriodRange() {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    let start;
+    if (this._period === 'day') start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    else if (this._period === 'week') { start = new Date(now); start.setDate(now.getDate() - 7); start.setHours(0,0,0,0); }
+    else if (this._period === 'year') { start = new Date(now); start.setFullYear(now.getFullYear() - 1); start.setHours(0,0,0,0); }
+    else { start = new Date(now); start.setMonth(now.getMonth() - 1); start.setHours(0,0,0,0); }
+    return { start, end };
+  },
+
+  async _loadStats() {
+    const pane = $('#stats-panel');
+    pane.innerHTML = '<div class="loading-spinner"></div>';
+    const { start, end } = this._getPeriodRange();
+    const stats = await DB.getReportStats(start.toISOString(), end.toISOString());
+
+    const byStatus = {}, bySeverity = {}, byDoctor = {}, byAnimal = {}, bySymptom = {};
+    const docMap = {};
+    (stats.doctors || []).forEach(d => docMap[d.id] = d.display_name);
+    for (const v of stats.visits) {
+      byStatus[v.status] = (byStatus[v.status] || 0) + 1;
+      if (v.severity) bySeverity[v.severity] = (bySeverity[v.severity] || 0) + 1;
+      if (v.primary_doctor_id) {
+        const n = docMap[v.primary_doctor_id] || '—';
+        byDoctor[n] = (byDoctor[n] || 0) + 1;
+      }
+      if (v.intake_animal_type) byAnimal[v.intake_animal_type] = (byAnimal[v.intake_animal_type] || 0) + 1;
+    }
+    for (const s of stats.syms) {
+      const label = SYMPTOM_LABEL[s.symptom_key] || s.symptom_key;
+      bySymptom[label] = (bySymptom[label] || 0) + 1;
+    }
+
+    const topDoctor = Object.entries(byDoctor).sort((a, b) => b[1] - a[1])[0];
+    const topSymptom = Object.entries(bySymptom).sort((a, b) => b[1] - a[1])[0];
+
+    const bar = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `<div class="bar-row"><span class="bar-label">${escHtml(k)}</span><div class="bar"><div class="bar-fill" style="width:${Math.min(100, v * 10)}%"></div><span class="bar-val">${v}</span></div></div>`).join('');
+
+    pane.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num">${stats.visits.length}</div><div class="stat-label">إجمالي الحالات</div></div>
+        <div class="stat-card"><div class="stat-num">${byStatus.completed || 0}</div><div class="stat-label">مكتملة</div></div>
+        <div class="stat-card"><div class="stat-num">${byStatus.in_progress || 0}</div><div class="stat-label">قيد المعالجة</div></div>
+        <div class="stat-card"><div class="stat-num">${(bySeverity.critical || 0) + (bySeverity.high || 0)}</div><div class="stat-label">حالات خطرة</div></div>
+      </div>
+      <div class="stats-two-col">
+        <div class="stat-panel">
+          <h3>🏆 الطبيب المميز</h3>
+          <p>${topDoctor ? `د. ${escHtml(topDoctor[0])} — ${topDoctor[1]} حالة` : '—'}</p>
+          <h4>حالات لكل طبيب</h4>
+          ${bar(byDoctor) || '<p class="muted">لا بيانات</p>'}
+        </div>
+        <div class="stat-panel">
+          <h3>🔥 أكثر الأعراض</h3>
+          <p>${topSymptom ? `${escHtml(topSymptom[0])} — ${topSymptom[1]} حالة` : '—'}</p>
+          <h4>توزيع الأعراض</h4>
+          ${bar(bySymptom) || '<p class="muted">لا بيانات</p>'}
+        </div>
+      </div>
+      <div class="stats-two-col">
+        <div class="stat-panel"><h3>🐾 نوع الحيوان</h3>${bar(byAnimal) || '<p class="muted">لا بيانات</p>'}</div>
+        <div class="stat-panel"><h3>⚠️ درجة الخطورة</h3>${bar(bySeverity) || '<p class="muted">لا بيانات</p>'}</div>
+      </div>
+    `;
+  },
+
+  async _generateAIReport() {
+    const btn = $('#generate-ai-report');
+    const out = $('#ai-report-output');
+    const { start, end } = this._getPeriodRange();
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري التوليد...';
+    out.style.display = 'block';
+    out.innerHTML = '<div class="loading-spinner"></div>';
+    try {
+      const r = await AI.generateReport({
+        period_start: start.toISOString().slice(0, 10),
+        period_end: end.toISOString().slice(0, 10),
+        report_type: this._period,
+      });
+      out.innerHTML = `<div class="report-box">
+        <div class="report-meta">${escHtml(r.report?.period_start)} → ${escHtml(r.report?.period_end)}</div>
+        <div class="report-content">${renderMarkdown(r.report?.content_md || '')}</div>
+        <p class="ai-disclaimer">${escHtml(r.disclaimer || '')}</p>
+      </div>`;
+      await this._loadSavedReports();
+    } catch (err) {
+      out.innerHTML = `<div class="ai-error">❌ ${escHtml(err.message || 'فشل التوليد')}</div>`;
+    }
+    btn.disabled = false;
+    btn.textContent = '📊 ولّد تقرير بالذكاء الصناعي';
+  },
+
+  async _loadSavedReports() {
+    const list = $('#saved-list');
+    if (!list) return;
+    const reports = await DB.getRecentAIReports(20);
+    if (!reports.length) { list.innerHTML = '<p class="muted">لا توجد تقارير محفوظة بعد.</p>'; return; }
+    list.innerHTML = reports.map(r => `
+      <div class="saved-item">
+        <div class="saved-header">
+          <strong>${escHtml(r.report_type || '—')}</strong>
+          <span>${escHtml(r.period_start)} → ${escHtml(r.period_end)}</span>
+          <small>${formatDateTimeAr(r.created_at)}</small>
+          ${r.generated_by?.display_name ? `<small>بواسطة د. ${escHtml(r.generated_by.display_name)}</small>` : ''}
+        </div>
+        <details><summary>عرض التقرير</summary><div class="report-content">${renderMarkdown(r.content_md || '')}</div></details>
+      </div>
+    `).join('');
+  }
+};
+
+
+// =============================================================
+// ADMIN DOCTORS VIEW — manage doctors (clinic-admin only)
+// =============================================================
+const AdminDoctorsView = {
+  async render(container) {
+    container.innerHTML = `
+      <div class="admin-doctors animate-in">
+        <div class="admin-header">
+          <a href="#doctor" class="back-link">← عودة</a>
+          <h1>👨‍⚕️ إدارة الأطباء</h1>
+          <button id="new-doctor-btn" class="btn btn-primary">+ إضافة طبيب</button>
+        </div>
+        <div id="doctors-list"></div>
+
+        <dialog id="new-doctor-dialog" class="dlg">
+          <form id="new-doctor-form" method="dialog" class="dlg-form">
+            <h2>إضافة طبيب جديد</h2>
+            <label class="form-field"><span>الاسم الكامل *</span><input name="full_name" required></label>
+            <label class="form-field"><span>الاسم المختصر *</span><input name="display_name" required></label>
+            <label class="form-field"><span>البريد الإلكتروني *</span><input type="email" name="email" required></label>
+            <label class="form-field"><span>كلمة المرور (6+ أحرف) *</span><input type="password" name="password" required minlength="6"></label>
+            <label class="form-field"><span>التخصص</span><input name="specialization" placeholder="مثال: عام / جلدية / جراحة"></label>
+            <label class="form-field"><span>الهاتف</span><input name="phone"></label>
+            <label class="form-field"><span>لون البروفايل</span><input type="color" name="avatar_color" value="#7c3aed"></label>
+            <label class="form-check"><input type="checkbox" name="is_admin"> مدير عيادة (صلاحيات كاملة)</label>
+            <div class="dlg-actions">
+              <button type="button" value="cancel" id="cancel-new-doctor" class="btn btn-ghost">إلغاء</button>
+              <button type="submit" class="btn btn-primary">إنشاء الحساب</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+    `;
+
+    await this._load();
+
+    $('#new-doctor-btn').addEventListener('click', () => $('#new-doctor-dialog').showModal());
+    $('#cancel-new-doctor').addEventListener('click', () => $('#new-doctor-dialog').close());
+    $('#new-doctor-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const payload = {
+        full_name: fd.get('full_name'),
+        display_name: fd.get('display_name'),
+        email: fd.get('email'),
+        password: fd.get('password'),
+        specialization: fd.get('specialization') || null,
+        phone: fd.get('phone') || null,
+        avatar_color: fd.get('avatar_color') || '#7c3aed',
+        is_admin: !!fd.get('is_admin'),
+      };
+      try {
+        await DB.createDoctor(payload);
+        showToast('✅ تم إنشاء حساب الطبيب', 'success');
+        $('#new-doctor-dialog').close();
+        e.target.reset();
+        await this._load();
+      } catch (err) {
+        showToast(`❌ ${err.message || 'فشل الإنشاء'}`, 'error');
+      }
+    });
+  },
+
+  async _load() {
+    const list = $('#doctors-list');
+    list.innerHTML = '<div class="loading-spinner"></div>';
+    const doctors = await DB.getAllDoctors();
+    list.innerHTML = `
+      <table class="doctors-table">
+        <thead><tr><th>الاسم</th><th>التخصص</th><th>الهاتف</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead>
+        <tbody>
+          ${doctors.map(d => `
+            <tr>
+              <td><span class="doctor-pill" style="background:${escHtml(d.avatar_color || '#7c3aed')}">${escHtml((d.display_name || '؟').slice(0,1))}</span> د. ${escHtml(d.full_name)}</td>
+              <td>${escHtml(d.specialization || '—')}</td>
+              <td>${escHtml(d.phone || '—')}</td>
+              <td>${d.is_admin ? '<span class="admin-badge">مدير</span>' : 'طبيب'}</td>
+              <td>${d.is_active ? '<span class="status-pill status-completed">فعّال</span>' : '<span class="status-pill status-cancelled">معطّل</span>'}</td>
+              <td>
+                <button class="btn btn-sm ${d.is_active ? 'btn-ghost' : 'btn-success'}" data-toggle="${d.id}" data-active="${d.is_active}">${d.is_active ? 'تعطيل' : 'تفعيل'}</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    list.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.toggle;
+        const newState = btn.dataset.active !== 'true';
+        try {
+          await DB.toggleDoctorActive(id, newState);
+          await this._load();
+        } catch (err) { showToast(err.message, 'error'); }
+      });
+    });
+  }
+};
+
+
 // ==========================================
 // INITIALIZATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize auth first
-  await Auth.init();
+  try {
+    console.log('🚀 Starting application initialization...');
 
-  // Initialize router
-  Router.init();
+    // Initialize auth first
+    console.log('🔐 Initializing authentication...');
+    await Auth.init();
+    console.log('✅ Auth initialized');
 
-  // Initialize animated background
-  initAnimatedBackground();
+    // Initialize router
+    console.log('🗂️ Initializing router...');
+    Router.init();
+    console.log('✅ Router initialized');
 
-  // Start auto-refresh
-  startAutoRefresh();
+    // Initialize animated background
+    console.log('🎨 Initializing background...');
+    initAnimatedBackground();
+    console.log('✅ Background initialized');
 
-  console.log('%c🐾 عيادة الكوخ البيطرية — نظام الحلاقة والتحميم', 'font-size:16px; font-weight:bold; color:#C026D3;');
-  console.log('%c🔐 نظام المصادقة: Supabase Auth', 'font-size:12px; color:#10B981;');
-  console.log('%c💾 قاعدة البيانات: Supabase PostgreSQL', 'font-size:12px; color:#3B82F6;');
+    // Start auto-refresh
+    console.log('🔄 Starting auto-refresh...');
+    startAutoRefresh();
+    console.log('✅ Auto-refresh started');
+
+    console.log('%c🐾 عيادة الكوخ البيطرية — نظام الحلاقة والتحميم', 'font-size:16px; font-weight:bold; color:#C026D3;');
+    console.log('%c🔐 نظام المصادقة: Supabase Auth', 'font-size:12px; color:#10B981;');
+    console.log('%c💾 قاعدة البيانات: Supabase PostgreSQL', 'font-size:12px; color:#3B82F6;');
+    console.log('%c✅ تم تحميل التطبيق بنجاح', 'font-size:12px; color:#10B981; font-weight:bold;');
+  } catch (err) {
+    console.error('❌ Fatal initialization error:', err);
+    document.body.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:center; height:100vh; background:#1a1a1a; color:white; font-family:sans-serif;">
+        <div style="text-align:center;">
+          <h1>⚠️ خطأ في تحميل التطبيق</h1>
+          <p>يرجى التحقق من وحدة التحكم (F12) للمزيد من التفاصيل</p>
+          <p style="color:#999; margin-top:20px;">${err.message}</p>
+        </div>
+      </div>
+    `;
+  }
 });

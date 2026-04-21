@@ -20,7 +20,9 @@ https://jt-b.com/webhook/whatsapp-workflow/270728.366423.354554.1776273183
 | `customer_name` | اسم الزبون | `أحمد علي` |
 | `pet_name` | اسم الحيوان | `ماكس` |
 | `service_name` | اسم الخدمة بالعربي | `تحميم طبي` |
-| `event_type` | نوع الحدث | `booking_confirmation` أو `task_started` أو `task_completed` أو `feedback_request` |
+| `event_type` | نوع الحدث | `booking_confirmation` / `task_started` / `task_completed` / `feedback_request` / `intake_received` / `doctor_patient_accepted` / `appointment_reminder` / `missed_followup` |
+| `scheduled_at` | موعد المتابعة (لـ `appointment_reminder` فقط) | `2026-04-20 14:30` |
+| `doctor_name` | اسم الطبيب (لـ `doctor_patient_accepted` فقط) | `د. ايمن` |
 
 ## الخطوات المطلوبة على JT-BOT
 
@@ -64,6 +66,54 @@ https://jt-b.com/webhook/whatsapp-workflow/270728.366423.354554.1776273183
 كيف كانت تجربتك معنا؟
 رد بتقييم من 1 إلى 5 ⭐
 رأيك يساعدنا نتحسن.
+— عيادة الكوخ البيطرية 🏠
+```
+
+---
+
+## 🆕 فروع نظام العيادة البيطرية (Medical Clinic)
+
+هذه الفروع الأربعة الجديدة تُضاف للـ Switch Node نفسه لدعم تدفق **زيارة الطبيب** (المراجع → قبول الطبيب → موعد المتابعة → التذكير).
+
+#### الفرع 5: `intake_received` (جديد — عند استلام طلب مراجع)
+**متى يُرسل**: مباشرة بعد تعبئة فورم "زيارة طبيب" من الصفحة الرئيسية.
+**رسالة مقترحة**:
+```
+مرحباً {{ body.customer_name }} 🐾
+وصلنا طلبك الخاص بـ {{ body.pet_name }}
+سيتم توجيهك إلى الطبيب المختص خلال دقائق، وسنتواصل معك فور الاستلام.
+— عيادة الكوخ البيطرية 🏠
+```
+
+#### الفرع 6: `doctor_patient_accepted` (جديد — عند قبول الطبيب للحالة)
+**متى يُرسل**: فور ما يضغط الطبيب زر "قبول" على لوحة الطبيب.
+**رسالة مقترحة**:
+```
+✅ {{ body.customer_name }}
+{{ body.doctor_name }} استلم حالة {{ body.pet_name }} وسيتواصل معك قريباً.
+شكراً لثقتك بنا 💜
+— عيادة الكوخ البيطرية 🏠
+```
+
+#### الفرع 7: `appointment_reminder` (جديد — تذكير بموعد متابعة)
+**متى يُرسل**: تلقائياً قبل الموعد بساعة (عبر `process-appointment-reminders` كل 10 دقائق).
+**رسالة مقترحة**:
+```
+🔔 تذكير، {{ body.customer_name }}
+موعد متابعة {{ body.pet_name }} بعد ساعة
+⏰ {{ body.scheduled_at }}
+نراك قريباً في العيادة.
+— عيادة الكوخ البيطرية 🏠
+```
+
+#### الفرع 8: `missed_followup` (جديد — الزبون ما حضر الموعد)
+**متى يُرسل**: تلقائياً بعد ساعتين من الموعد في حال لم يُسجَّل حضور (عبر `process-appointment-reminders`).
+**رسالة مقترحة**:
+```
+مرحباً {{ body.customer_name }} 💜
+لاحظنا أنك ما حضرت موعد متابعة {{ body.pet_name }} اليوم.
+هل تحتاج إعادة جدولة؟ تواصل معنا.
+صحة حيوانك الأليف أولويتنا.
 — عيادة الكوخ البيطرية 🏠
 ```
 
