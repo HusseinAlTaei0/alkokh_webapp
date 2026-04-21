@@ -1878,6 +1878,7 @@ const BookingView = {
           ).catch(() => {});
         }
         playNotificationSound();
+        this.lastOrderId = typeof newOrderId === 'string' ? newOrderId : null;
         this.step = 4;
         this._renderStep($('#app'));
       } catch (err) {
@@ -1895,6 +1896,10 @@ const BookingView = {
 
   async _renderConfirmation(el) {
     const waitingCount = await DB.getWaitingCount();
+    const orderId = this.lastOrderId;
+    const qrUrl = orderId
+      ? `${window.location.origin}${window.location.pathname}#order/${orderId}`
+      : null;
 
     el.innerHTML = `
       <div class="bk-confirm-page animate-in">
@@ -1915,12 +1920,58 @@ const BookingView = {
           <div class="bk-queue-hint">سيتم استدعاؤك قريباً ✂️</div>
         </div>
 
+        ${qrUrl ? `
+        <div class="qr-glass-card">
+          <div class="qr-glass-card-label">
+            <span class="qr-label-dot"></span>
+            رمز حجزك
+          </div>
+          <div class="qr-code-wrapper">
+            <div id="booking-qr" class="qr-canvas"></div>
+          </div>
+          <p class="qr-glass-hint">📌 احتفظ بهذا الرمز — يمكن مسحه لمتابعة حالة حجزك</p>
+          <div class="qr-glass-actions">
+            <button type="button" id="bk-qr-download" class="qr-action-btn">
+              <span>⬇️</span> حفظ
+            </button>
+            <button type="button" id="bk-qr-print" class="qr-action-btn">
+              <span>🖨️</span> طباعة
+            </button>
+          </div>
+        </div>
+        ` : ''}
+
         <button class="bk-new-btn" id="new-booking">➕ حجز خدمة جديدة</button>
         <a href="#home" class="qr-back-btn" style="margin-top:10px;">← العودة للرئيسية</a>
       </div>
     `;
 
-    el.querySelector('#new-booking')?.addEventListener('click', () => { this.step = 1; this._renderStep($('#app')); });
+    if (qrUrl) {
+      const qrEl = document.getElementById('booking-qr');
+      const renderQR = () => {
+        if (!window.QRCode) return setTimeout(renderQR, 200);
+        try {
+          new window.QRCode(qrEl, {
+            text: qrUrl,
+            width: 240,
+            height: 240,
+            colorDark: '#1a1a1a',
+            colorLight: '#ffffff',
+            correctLevel: window.QRCode.CorrectLevel.H,
+          });
+        } catch (e) { qrEl.textContent = qrUrl; }
+      };
+      renderQR();
+      document.getElementById('bk-qr-download')?.addEventListener('click', () => {
+        const img = qrEl.querySelector('img') || qrEl.querySelector('canvas');
+        if (!img) return;
+        const src = img.tagName === 'IMG' ? img.src : img.toDataURL('image/png');
+        const a = document.createElement('a'); a.download = `alkokh-order-${orderId}.png`; a.href = src; a.click();
+      });
+      document.getElementById('bk-qr-print')?.addEventListener('click', () => window.print());
+    }
+
+    el.querySelector('#new-booking')?.addEventListener('click', () => { this.step = 1; this.lastOrderId = null; this._renderStep($('#app')); });
   }
 };
 
