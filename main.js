@@ -1373,8 +1373,14 @@ const Router = {
       case 'employee':
         await EmployeeView.render(app);
         break;
+      case 'employees':
+        await EmployeesManagementView.render(app);
+        break;
       case 'operator':
         await OperatorView.render(app);
+        break;
+      case 'reports':
+        await DashboardView.render(app);
         break;
       case 'dashboard':
         await DashboardView.render(app);
@@ -1612,7 +1618,7 @@ const BookingView = {
         </div>
         <div class="service-card" data-category="dog_grooming" id="svc-dog">
           <span class="emoji"><img src="assets/alkokh_icons/dog.png" alt="كلب"></span>
-          <div class="title">حلاقة كلب</div>
+          <div class="title">حلاقة الكلب</div>
           <div class="subtitle">قصات متنوعة للكلاب</div>
         </div>
         <div class="service-card" data-category="bath" id="svc-bath">
@@ -1638,7 +1644,7 @@ const BookingView = {
     const services = this._services.filter(s => s.category === this.selectedCategory);
     const categoryNames = {
       'cat_grooming': '🐱 حلاقة قطة',
-      'dog_grooming': '🐕 حلاقة كلب',
+      'dog_grooming': '🐕 حلاقة الكلب',
       'bath': '🛁 تحميم'
     };
 
@@ -2447,6 +2453,11 @@ const EmployeeView = {
           <span class="stat-icon">✅</span>
           <div class="stat-value">${completedOrders.length}</div>
           <div class="stat-label">مكتملة اليوم</div>
+        </div>
+        <div class="stat-card gold">
+          <span class="stat-icon"><img src="assets/alkokh_icons/customers.png" alt="customers"></span>
+          <div class="stat-value">${stats.uniqueCustomers}</div>
+          <div class="stat-label">زبائن فريدين</div>
         </div>
       </div>
     `;
@@ -3260,26 +3271,45 @@ function playNotifSound() {
 const LandingView = {
   async render(container) {
     container.innerHTML = `
-      <div class="landing-view animate-in">
-        <div class="landing-hero">
-          <div class="landing-logo"><img src="assets/logo.svg" alt="الكوخ"></div>
-          <h1 class="landing-title">عيادة الكوخ البيطرية</h1>
-          <p class="landing-subtitle">اختر الخدمة المناسبة لحيوانك</p>
+      <div class="home-view animate-in">
+
+        <div class="home-hero">
+          <div class="home-hero-inner">
+            <img src="assets/logo.svg" alt="الكوخ" class="home-logo">
+            <div class="home-hero-text">
+              <h1 class="home-clinic-name">عيادة الكوخ البيطرية</h1>
+              <p class="home-clinic-sub">نظام الإدارة المتكامل</p>
+            </div>
+          </div>
         </div>
-        <div class="landing-cards">
-          <a href="#booking/medical" class="landing-card landing-card-medical">
-            <div class="landing-icon">🩺</div>
-            <h2>زيارة طبيب</h2>
-            <p>استشارة طبية، فحص، علاج ومتابعة</p>
-            <span class="landing-cta">ابدأ الحجز ←</span>
+
+        <div class="home-nav-grid">
+          <a href="#employees" class="home-nav-card card-next interactive padded">
+            <div class="home-nav-icon">👥</div>
+            <div class="home-nav-text">
+              <h3>الموظفون</h3>
+              <p>الأطباء وفريق الحلاقة والتحميم</p>
+            </div>
+            <span class="home-nav-arrow">←</span>
           </a>
-          <a href="#grooming" class="landing-card landing-card-grooming">
-            <div class="landing-icon">✂️</div>
-            <h2>خدمات أخرى</h2>
-            <p>حلاقة وتحميم — عناية شاملة</p>
-            <span class="landing-cta">ابدأ الحجز ←</span>
+          <a href="#operator" class="home-nav-card card-next interactive padded">
+            <div class="home-nav-icon">📋</div>
+            <div class="home-nav-text">
+              <h3>المنظم</h3>
+              <p>إدارة الطلبات والحجوزات</p>
+            </div>
+            <span class="home-nav-arrow">←</span>
+          </a>
+          <a href="#reports" class="home-nav-card card-next interactive padded">
+            <div class="home-nav-icon">📊</div>
+            <div class="home-nav-text">
+              <h3>التقارير</h3>
+              <p>إحصائيات وتحليلات الأداء</p>
+            </div>
+            <span class="home-nav-arrow">←</span>
           </a>
         </div>
+
       </div>
     `;
   }
@@ -4271,7 +4301,7 @@ const AdminDoctorsView = {
               <td><span class="doctor-pill" style="background:${escHtml(d.avatar_color || '#7c3aed')}">${escHtml((d.display_name || '؟').slice(0,1))}</span> د. ${escHtml(d.full_name)}</td>
               <td>${escHtml(d.specialization || '—')}</td>
               <td>${escHtml(d.phone || '—')}</td>
-              <td>${d.is_admin ? '<span class="admin-badge">مدير</span>' : 'طبيب'}</td>
+              <td>${d.is_admin ? '<span class="admin-badge">👑 مدير</span>' : 'طبيب'}</td>
               <td>${d.is_active ? '<span class="status-pill status-completed">فعّال</span>' : '<span class="status-pill status-cancelled">معطّل</span>'}</td>
               <td>
                 <button class="btn btn-sm ${d.is_active ? 'btn-ghost' : 'btn-success'}" data-toggle="${d.id}" data-active="${d.is_active}">${d.is_active ? 'تعطيل' : 'تفعيل'}</button>
@@ -4289,6 +4319,202 @@ const AdminDoctorsView = {
           await DB.toggleDoctorActive(id, newState);
           await this._load();
         } catch (err) { showToast(err.message, 'error'); }
+      });
+    });
+  }
+};
+
+
+// ==========================================
+// EMPLOYEES MANAGEMENT VIEW (Unified)
+// ==========================================
+const EmployeesManagementView = {
+  async render(container) {
+    showLoading(container);
+    
+    // Get doctors and employees data
+    const doctors = await DB.getAllDoctors();
+    const employees = await DB.getEmployees();
+    
+    // Group employees by specialization
+    const groomers = employees.filter(e => e.specialization === 'groomer');
+    const bathers = employees.filter(e => e.specialization === 'bather');
+    
+    let html = `
+      <div class="page-header animate-in">
+        <h1>👥 إدارة الموظفين</h1>
+        <p>الأطباء والمسؤولين عن الحلاقة والتحميم</p>
+      </div>
+    `;
+    
+    // === DOCTORS SECTION ===
+    html += `
+      <div class="employees-section animate-in-delay-1">
+        <h2 class="section-title">🩺 الأطباء</h2>
+        <div class="employees-grid">
+    `;
+    
+    if (doctors.length === 0) {
+      html += `<div style="grid-column:1/-1; text-align:center; padding:32px; opacity:0.6;">لا يوجد أطباء حالياً</div>`;
+    } else {
+      doctors.forEach(doc => {
+        html += this._renderEmployeeCard(doc, 'doctor');
+      });
+    }
+    
+    html += `</div></div>`;
+    
+    // === GROOMERS SECTION ===
+    html += `
+      <div class="employees-section animate-in-delay-2">
+        <h2 class="section-title">✂️ الحلاقين</h2>
+        <div class="employees-grid">
+    `;
+    
+    if (groomers.length === 0) {
+      html += `<div style="grid-column:1/-1; text-align:center; padding:32px; opacity:0.6;">لا يوجد حلاقين حالياً</div>`;
+    } else {
+      groomers.forEach(emp => {
+        html += this._renderEmployeeCard(emp, 'groomer');
+      });
+    }
+    
+    html += `</div></div>`;
+    
+    // === BATHERS SECTION ===
+    html += `
+      <div class="employees-section animate-in-delay-3">
+        <h2 class="section-title">🛁 المحممين</h2>
+        <div class="employees-grid">
+    `;
+    
+    if (bathers.length === 0) {
+      html += `<div style="grid-column:1/-1; text-align:center; padding:32px; opacity:0.6;">لا يوجد محممين حالياً</div>`;
+    } else {
+      bathers.forEach(emp => {
+        html += this._renderEmployeeCard(emp, 'bather');
+      });
+    }
+    
+    html += `</div></div>`;
+    
+    container.innerHTML = html;
+    this._bindEvents(container);
+  },
+  
+  _renderEmployeeCard(emp, type) {
+    const initials = emp.name_ar?.substring(0, 2) || emp.display_name?.substring(0, 2) || '??';
+    const isActive = emp.is_active !== false;
+    const isDoctor = type === 'doctor';
+    const isAdmin = isDoctor && emp.is_admin;
+    
+    const statusText = isActive ? 'نشط ✅' : 'معطل ⚠️';
+    const statusColor = isActive ? '#10b981' : '#ef4444';
+    
+    let typeLabel = '👤 موظف';
+    if (isDoctor) typeLabel = '🩺 طبيب';
+    else if (type === 'groomer') typeLabel = '✂️ حلاق';
+    else if (type === 'bather') typeLabel = '🛁 المحمم';
+    
+    return `
+      <div class="employee-card" data-id="${emp.id}" data-type="${type}">
+        <div class="employee-card-header">
+          <div class="employee-avatar" style="background:${emp.avatar_color || '#9333ea'};">
+            ${initials}
+          </div>
+          <div class="employee-info">
+            <h3 class="employee-name">${emp.name_ar || emp.display_name || 'غير معروف'}</h3>
+            <p class="employee-type">${typeLabel}</p>
+            ${isAdmin ? '<span class="badge badge-admin">👑 مدير</span>' : ''}
+            <span class="badge" style="background:${statusColor}30; color:${statusColor}; border:1px solid ${statusColor};">${statusText}</span>
+          </div>
+        </div>
+        
+        <div class="employee-card-body">
+          ${isDoctor ? `
+            <div class="employee-field">
+              <label>التخصص الطبي</label>
+              <p>${emp.specialization || 'عام'}</p>
+            </div>
+            <div class="employee-field">
+              <label>البريد الإلكتروني</label>
+              <p dir="ltr">${emp.email || '-'}</p>
+            </div>
+            ${emp.phone ? `
+              <div class="employee-field">
+                <label>الهاتف</label>
+                <p dir="ltr">${emp.phone}</p>
+              </div>
+            ` : ''}
+          ` : `
+            <div class="employee-field">
+              <label>البريد الإلكتروني</label>
+              <p dir="ltr">${emp.email || '-'}</p>
+            </div>
+            <div class="employee-field">
+              <label>كلمة المرور</label>
+              <p>••••••••</p>
+            </div>
+          `}
+        </div>
+        
+        <div class="employee-card-actions">
+          <button class="btn btn-sm btn-secondary edit-btn" data-id="${emp.id}" data-type="${type}">
+            ✏️ تعديل
+          </button>
+          <button class="btn btn-sm ${isActive ? 'btn-warning' : 'btn-success'} toggle-status-btn" data-id="${emp.id}" data-type="${type}" data-active="${isActive}">
+            ${isActive ? '🔴 تعطيل' : '🟢 تفعيل'}
+          </button>
+          <button class="btn btn-sm btn-danger delete-btn" data-id="${emp.id}" data-type="${type}">
+            🗑️ حذف
+          </button>
+        </div>
+      </div>
+    `;
+  },
+  
+  _bindEvents(container) {
+    // Edit button
+    container.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const type = btn.dataset.type;
+        showToast('📝 خاصية التعديل ستُضاف قريباً', 'info');
+      });
+    });
+    
+    // Toggle status button
+    container.querySelectorAll('.toggle-status-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const type = btn.dataset.type;
+        const isCurrentlyActive = btn.dataset.active === 'true';
+        const newStatus = !isCurrentlyActive;
+        
+        if (!confirm(`هل تريد ${newStatus ? 'تفعيل' : 'تعطيل'} هذا الموظف؟`)) return;
+        
+        try {
+          btn.disabled = true;
+          if (type === 'doctor') {
+            await DB.toggleDoctorActive(id, newStatus);
+          }
+          showToast(`✅ تم ${newStatus ? 'تفعيل' : 'تعطيل'} الموظف`, 'success');
+          await this.render(container);
+        } catch (err) {
+          console.error(err);
+          showToast('❌ حدث خطأ', 'error');
+          btn.disabled = false;
+        }
+      });
+    });
+    
+    // Delete button
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const type = btn.dataset.type;
+        if (!confirm('⚠️ هل أنت متأكد من حذف هذا الموظف؟ سيؤدي هذا إلى فقدان جميع البيانات المرتبطة به.')) return;
+        showToast('🔒 حذف الموظفين ممنوع للحماية. تواصل مع المسؤول.', 'warning');
       });
     });
   }

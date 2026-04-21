@@ -38,9 +38,11 @@
 @import "./layout/_background.css";
 
 /* === VIEWS (redesign overrides — applied last for priority) === */
+@import "./views/_landing.css";
 @import "./views/_login.css";
 @import "./views/_booking.css";
 @import "./views/_employee.css";
+@import "./views/_employees.css";
 @import "./views/_operator.css";
 @import "./views/_dashboard.css";
 

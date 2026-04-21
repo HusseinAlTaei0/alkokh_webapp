@@ -1,0 +1,160 @@
+/* ============================================================
+   HOME / LANDING VIEW
+   Uses the new design token system for a unified look.
+   ============================================================ */
+
+.home-view {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 var(--sp-4) var(--sp-10);
+}
+
+/* ── Hero section ── */
+.home-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-12) var(--sp-4) var(--sp-10);
+  text-align: center;
+}
+
+.home-hero-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+.home-logo {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.35));
+}
+
+.home-hero-text {
+  text-align: right;
+}
+
+.home-clinic-name {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: var(--fw-extrabold, 800);
+  color: var(--fg-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.home-clinic-sub {
+  font-size: var(--fs-base, 1rem);
+  color: var(--fg-secondary);
+  margin: var(--sp-1) 0 0;
+}
+
+/* ── Quick-nav grid ── */
+.home-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-4);
+}
+
+.home-nav-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  text-decoration: none !important;
+  color: var(--fg-primary) !important;
+}
+
+.home-nav-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-soft, rgba(139, 92, 246, 0.12));
+  border-radius: var(--r-md, 14px);
+}
+
+.home-nav-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-nav-text h3 {
+  font-size: var(--fs-lg, 1.125rem);
+  font-weight: var(--fw-bold, 700);
+  margin: 0 0 var(--sp-1);
+  color: var(--fg-primary);
+}
+
+.home-nav-text p {
+  font-size: var(--fs-sm, 0.875rem);
+  color: var(--fg-secondary);
+  margin: 0;
+}
+
+.home-nav-arrow {
+  font-size: 1.2rem;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.home-nav-card:hover .home-nav-arrow {
+  transform: translateX(-4px);
+}
+
+/* ── Intake view header — unified with page-header style ── */
+.intake-view {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 0 var(--sp-4) var(--sp-10);
+}
+
+.intake-header {
+  position: relative;
+  text-align: center;
+  padding: var(--sp-8) 0 var(--sp-6);
+  margin-bottom: var(--sp-6);
+}
+
+.intake-header h1 {
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  font-weight: var(--fw-extrabold, 800);
+  color: var(--fg-primary);
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+
+.intake-header p {
+  font-size: var(--fs-base, 1rem);
+  color: var(--fg-secondary);
+  margin: 0;
+}
+
+.intake-header .back-link {
+  color: var(--brand, #8B5CF6);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.intake-header .back-link:hover {
+  color: var(--brand-hover, #7C3AED);
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .home-hero-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .home-hero-text {
+    text-align: center;
+  }
+
+  .home-nav-grid {
+    grid-template-columns: 1fr;
+  }
+}
