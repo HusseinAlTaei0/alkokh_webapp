@@ -45,6 +45,7 @@
 @import "./views/_employees.css";
 @import "./views/_operator.css";
 @import "./views/_dashboard.css";
+@import "./views/_unified.css";
 
 /* === RESPONSIVE === */
 @import "./_responsive.css";

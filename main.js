@@ -79,33 +79,25 @@ const Auth = {
   _doctor: null, // populated when the logged-in user is a doctor
 
   async init() {
-    // Wait for Supabase client to be initialized
-    let attempts = 0;
-    while (!supabaseClient && attempts < 100) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      attempts++;
-    }
-
     if (!supabaseClient) {
-      console.error('❌ Supabase client initialization failed');
+      console.warn('Supabase client not ready at Auth.init — will rely on onAuthStateChange');
       return;
     }
-
-    try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
+    // Non-blocking: fetch session in the background, don't block initial render
+    supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
       this._user = session?.user || null;
       await this._loadDoctor();
       this._updateUI();
+      if (Router.currentView && ['employees','operator','reports','doctor','admin'].includes(Router.currentView)) {
+        Router.route();
+      }
+    }).catch(err => console.warn('getSession failed:', err));
 
-      // Listen for auth state changes
-      supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-        this._user = session?.user || null;
-        await this._loadDoctor();
-        this._updateUI();
-      });
-    } catch (err) {
-      console.error('❌ Auth initialization failed:', err);
-    }
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      this._user = session?.user || null;
+      await this._loadDoctor();
+      this._updateUI();
+    });
   },
 
   async login(email, password) {
@@ -710,6 +702,28 @@ const DB = {
     return data;
   },
 
+  async getCustomerByPhone(phone) {
+    if (!phone) return null;
+    const { data } = await supabaseClient
+      .from('customers').select('*').eq('phone', phone).maybeSingle();
+    return data || null;
+  },
+
+  async getCustomerProfileByPhone(phone) {
+    const customer = await this.getCustomerByPhone(phone);
+    if (!customer) return null;
+    const { data: patients } = await supabaseClient
+      .from('patients').select('*')
+      .eq('customer_id', customer.id)
+      .order('updated_at', { ascending: false });
+    const { data: lastVisit } = await supabaseClient
+      .from('visits').select('*')
+      .eq('customer_id', customer.id)
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle();
+    return { customer, patients: patients || [], lastVisit: lastVisit || null };
+  },
+
   // --- Patients (animal files) ---
   async findOrCreatePatient({ customer_id, name, animal_type, age_months, breed, gender }) {
     if (customer_id) {
@@ -1307,6 +1321,13 @@ const Router = {
     }
 
     // --- Auth gates ---
+    if (head === 'employees' || head === 'reports') {
+      if (!Auth.isAuthenticated()) {
+        this.currentView = 'login';
+        LoginView.render($('#app'), head);
+        return;
+      }
+    }
     if (head === 'operator' || head === 'dashboard') {
       const savedEmployee = sessionStorage.getItem('alkokh_employee');
       if (savedEmployee && !Auth.isAuthenticated()) {
@@ -1402,6 +1423,9 @@ const Router = {
         } else {
           await LandingView.render(app);
         }
+        break;
+      case 'patient':
+        await PatientProfileView.render(app, subPath[0]);
         break;
       default:
         await LandingView.render(app);
@@ -3015,13 +3039,14 @@ const DashboardView = {
       });
     }
 
-    // Render charts after DOM is ready
-    requestAnimationFrame(() => {
-      this._renderCharts(stats, weeklyData);
-    });
+    // Lazy-load Chart.js then render
+    loadChartJs().then(() => {
+      requestAnimationFrame(() => this._renderCharts(stats, weeklyData));
+    }).catch(err => console.warn('Chart.js load failed:', err));
   },
 
   _renderCharts(stats, weeklyData) {
+    if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded yet'); return; }
     // Destroy existing charts
     Object.values(this.charts).forEach(c => c.destroy?.());
     this.charts = {};
@@ -3182,6 +3207,24 @@ function startAutoRefresh() {
 
 
 // ==========================================
+// LAZY LOADERS
+// ==========================================
+let _chartJsPromise = null;
+function loadChartJs() {
+  if (typeof Chart !== 'undefined') return Promise.resolve();
+  if (_chartJsPromise) return _chartJsPromise;
+  _chartJsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Chart.js load failed'));
+    document.head.appendChild(s);
+  });
+  return _chartJsPromise;
+}
+
+// ==========================================
 // BACKGROUND ANIMATION
 // ==========================================
 function initAnimatedBackground() {
@@ -3196,7 +3239,7 @@ function initAnimatedBackground() {
     <ellipse cx="107" cy="78" rx="9" ry="11"/>
   </svg>`;
 
-  const particleCount = 20;
+  const particleCount = 8;
   for (let i = 0; i < particleCount; i++) {
     const paw = document.createElement('div');
     paw.className = 'floating-paw';
@@ -3278,35 +3321,25 @@ const LandingView = {
             <img src="assets/logo.svg" alt="الكوخ" class="home-logo">
             <div class="home-hero-text">
               <h1 class="home-clinic-name">عيادة الكوخ البيطرية</h1>
-              <p class="home-clinic-sub">نظام الإدارة المتكامل</p>
+              <p class="home-clinic-sub">اختر نوع الخدمة</p>
             </div>
           </div>
         </div>
 
-        <div class="home-nav-grid">
-          <a href="#employees" class="home-nav-card card-next interactive padded">
-            <div class="home-nav-icon">👥</div>
-            <div class="home-nav-text">
-              <h3>الموظفون</h3>
-              <p>الأطباء وفريق الحلاقة والتحميم</p>
-            </div>
-            <span class="home-nav-arrow">←</span>
+        <div class="home-services-grid">
+          <a href="#booking/medical" class="home-service-card service-medical">
+            <div class="service-glow"></div>
+            <div class="service-icon">🩺</div>
+            <h2 class="service-title">زيارة طبيب</h2>
+            <p class="service-desc">استشارة طبية وفحص شامل للحيوان الأليف مع نخبة من الأطباء البيطريين</p>
+            <span class="service-cta">احجز استشارة ←</span>
           </a>
-          <a href="#operator" class="home-nav-card card-next interactive padded">
-            <div class="home-nav-icon">📋</div>
-            <div class="home-nav-text">
-              <h3>المنظم</h3>
-              <p>إدارة الطلبات والحجوزات</p>
-            </div>
-            <span class="home-nav-arrow">←</span>
-          </a>
-          <a href="#reports" class="home-nav-card card-next interactive padded">
-            <div class="home-nav-icon">📊</div>
-            <div class="home-nav-text">
-              <h3>التقارير</h3>
-              <p>إحصائيات وتحليلات الأداء</p>
-            </div>
-            <span class="home-nav-arrow">←</span>
+          <a href="#grooming" class="home-service-card service-grooming">
+            <div class="service-glow"></div>
+            <div class="service-icon">✂️</div>
+            <h2 class="service-title">الحلاقة والتحميم</h2>
+            <p class="service-desc">خدمات تجميل وتحميم احترافية تحافظ على صحة ونظافة حيوانك الأليف</p>
+            <span class="service-cta">احجز موعد ←</span>
           </a>
         </div>
 
@@ -3403,6 +3436,45 @@ const MedicalIntakeView = {
       });
     });
 
+    // --- Autofill memory: lookup by phone ---
+    const phoneInput = form.querySelector('input[name="phone"]');
+    let autofillTimer = null;
+    const tryAutofill = async () => {
+      const phone = String(phoneInput.value || '').trim();
+      if (phone.length < 8) return;
+      try {
+        const profile = await DB.getCustomerProfileByPhone(phone);
+        if (!profile) return;
+        const setIfEmpty = (name, val) => {
+          const el = form.querySelector(`[name="${name}"]`);
+          if (el && !el.value && val) el.value = val;
+        };
+        setIfEmpty('customer_name', profile.customer.name);
+        const p = profile.patients[0];
+        const lv = profile.lastVisit;
+        if (p) {
+          setIfEmpty('animal_type', p.animal_type);
+          setIfEmpty('pet_name', p.name);
+        }
+        if (lv) {
+          setIfEmpty('area', lv.intake_area);
+          setIfEmpty('animal_age', lv.intake_animal_age);
+        }
+        let badge = form.querySelector('.autofill-badge');
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'autofill-badge';
+          badge.innerHTML = `✨ أهلاً بعودتك ${escHtml(profile.customer.name || '')} — تم تعبئة بياناتك`;
+          form.insertBefore(badge, form.firstChild);
+        }
+      } catch (err) { console.warn('autofill failed:', err); }
+    };
+    phoneInput.addEventListener('blur', tryAutofill);
+    phoneInput.addEventListener('input', () => {
+      clearTimeout(autofillTimer);
+      autofillTimer = setTimeout(tryAutofill, 600);
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
@@ -3453,18 +3525,62 @@ const MedicalIntakeView = {
           orderId: null,
         }).catch(err => console.warn('intake whatsapp failed:', err));
 
-        // success screen
+        // success screen with QR code (fallback to visit id if patient missing)
+        const patientId = patient?.id ?? '';
+        const qrTarget = patientId ? `patient/${patientId}` : (visit?.id ? `visit/${visit.id}` : '');
+        const qrUrl = `${window.location.origin}${window.location.pathname}#${qrTarget}`;
         container.innerHTML = `
           <div class="intake-success animate-in">
             <div class="success-icon">✅</div>
             <h1>تم إرسال طلبك بنجاح</h1>
             <p class="success-message">سيتم توجيهك إلى الطبيب المختص خلال دقائق</p>
             <p class="success-sub">راح تصلك رسالة واتساب بالتفاصيل على الرقم ${escHtml(phone)}</p>
+
+            ${qrTarget ? `
+              <div class="qr-card">
+                <h3>📱 رمز QR الخاص بملفك</h3>
+                <p class="qr-hint">احتفظ بهذا الرمز — في زيارتك القادمة يمسحه الطبيب لعرض ملفك الطبي كاملاً</p>
+                <div id="patient-qr" class="qr-canvas"></div>
+                <div class="qr-actions">
+                  <button type="button" id="qr-download" class="btn btn-outline">⬇️ حفظ الصورة</button>
+                  <button type="button" id="qr-print" class="btn btn-outline">🖨️ طباعة</button>
+                </div>
+              </div>
+            ` : ''}
+
             <div class="success-actions">
               <a href="#home" class="btn btn-primary">العودة للرئيسية</a>
             </div>
           </div>
         `;
+
+        if (qrTarget) {
+          const qrEl = document.getElementById('patient-qr');
+          const renderQR = () => {
+            if (!window.QRCode) return setTimeout(renderQR, 200);
+            try {
+              new window.QRCode(qrEl, {
+                text: qrUrl,
+                width: 240,
+                height: 240,
+                colorDark: '#1a1a1a',
+                colorLight: '#ffffff',
+                correctLevel: window.QRCode.CorrectLevel.H,
+              });
+            } catch (qe) { console.warn('QR render failed:', qe); qrEl.textContent = qrUrl; }
+          };
+          renderQR();
+          document.getElementById('qr-download')?.addEventListener('click', () => {
+            const img = qrEl.querySelector('img') || qrEl.querySelector('canvas');
+            if (!img) return;
+            const src = img.tagName === 'IMG' ? img.src : img.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `alkokh-${qrTarget.replace('/', '-')}.png`;
+            link.href = src;
+            link.click();
+          });
+          document.getElementById('qr-print')?.addEventListener('click', () => window.print());
+        }
       } catch (err) {
         console.error('Intake submit failed:', err);
         showToast(`❌ فشل إرسال الطلب: ${err?.message || 'خطأ غير معروف'}`, 'error');
@@ -3472,6 +3588,75 @@ const MedicalIntakeView = {
         submitBtn.innerHTML = '<span>📨</span><span>إرسال الطلب</span>';
       }
     });
+  }
+};
+
+
+// =============================================================
+// PATIENT PROFILE VIEW — opened via QR code scan
+// =============================================================
+const PatientProfileView = {
+  async render(container, patientId) {
+    if (!patientId) {
+      container.innerHTML = `<div class="empty-state">⛔ معرّف الحيوان مفقود</div>`;
+      return;
+    }
+    container.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>جاري تحميل الملف...</p></div>`;
+    try {
+      const patient = await DB.getPatient(patientId);
+      if (!patient) {
+        container.innerHTML = `<div class="empty-state">❓ لم يتم العثور على هذا الملف</div>`;
+        return;
+      }
+      const history = await DB.getPatientHistory(patientId);
+      const customer = patient.customer_id
+        ? (await supabaseClient.from('customers').select('*').eq('id', patient.customer_id).maybeSingle()).data
+        : null;
+
+      container.innerHTML = `
+        <div class="patient-profile animate-in">
+          <div class="intake-header">
+            <a href="#home" class="back-link">← عودة</a>
+            <h1>📋 ملف الحيوان</h1>
+          </div>
+
+          <div class="patient-hero">
+            <div class="patient-avatar">${escHtml(patient.animal_type?.[0] || '🐾')}</div>
+            <div class="patient-hero-info">
+              <h2>${escHtml(patient.name || 'بدون اسم')}</h2>
+              <p class="patient-meta">
+                <span>🐾 ${escHtml(patient.animal_type || '-')}</span>
+                ${patient.breed ? `<span>🧬 ${escHtml(patient.breed)}</span>` : ''}
+                ${patient.age_months != null ? `<span>📅 ${patient.age_months} شهر</span>` : ''}
+                ${patient.gender ? `<span>⚧ ${escHtml(patient.gender)}</span>` : ''}
+              </p>
+              ${customer ? `<p class="patient-owner">👤 ${escHtml(customer.name || '')} — 📞 ${escHtml(customer.phone || '')}</p>` : ''}
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>📜 سجل الزيارات (${history.length})</h3>
+            ${history.length === 0 ? `<p class="empty-state">لا توجد زيارات سابقة</p>` : `
+              <div class="visit-history">
+                ${history.map(v => `
+                  <div class="visit-history-item">
+                    <div class="visit-history-head">
+                      <span class="visit-date">${new Date(v.created_at).toLocaleString('ar')}</span>
+                      <span class="visit-status status-${escHtml(v.status || 'waiting')}">${escHtml(v.status || '-')}</span>
+                    </div>
+                    ${v.intake_notes ? `<p class="visit-notes">${escHtml(v.intake_notes)}</p>` : ''}
+                    ${v.diagnosis ? `<p class="visit-diagnosis"><strong>التشخيص:</strong> ${escHtml(v.diagnosis)}</p>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      console.error('PatientProfileView error:', err);
+      container.innerHTML = `<div class="empty-state">❌ خطأ في تحميل الملف: ${escHtml(err?.message || '')}</div>`;
+    }
   }
 };
 
@@ -4330,8 +4515,28 @@ const AdminDoctorsView = {
 // ==========================================
 const EmployeesManagementView = {
   async render(container) {
+    // Role dispatch: doctors land on their dashboard, admins on the management list,
+    // otherwise show a friendly "no permissions" message.
+    if (Auth.isDoctor() && !Auth.isClinicAdmin()) {
+      window.location.hash = '#doctor';
+      return;
+    }
+    if (!Auth.isClinicAdmin()) {
+      container.innerHTML = `
+        <div class="page-header animate-in">
+          <h1>👥 صفحة الموظفين</h1>
+        </div>
+        <div class="empty-state panel">
+          <p>لا توجد صلاحيات لعرض هذه الصفحة.</p>
+          <p>يرجى تسجيل الدخول بحساب طبيب أو مدير.</p>
+          <a href="#home" class="btn btn-primary" style="margin-top:16px;">العودة للرئيسية</a>
+        </div>
+      `;
+      return;
+    }
+
     showLoading(container);
-    
+
     // Get doctors and employees data
     const doctors = await DB.getAllDoctors();
     const employees = await DB.getEmployees();

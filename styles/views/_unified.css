@@ -1,0 +1,504 @@
+/* ============================================================
+   UNIFIED DESIGN — Glass Morphism across all views
+   Overrides legacy styles in index.css to match medical/home design.
+   Applied LAST so it wins the cascade.
+   ============================================================ */
+
+/* === LANDING / HOME SERVICE CARDS === */
+.home-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  max-width: 1100px;
+  margin: 48px auto;
+  padding: 0 20px;
+}
+
+.home-service-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 32px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s;
+}
+
+[data-theme="light"] .home-service-card {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 50px rgba(139, 92, 246, 0.15);
+}
+
+.home-service-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 30px 80px rgba(139, 92, 246, 0.4);
+}
+
+.service-glow {
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(circle at 50% 30%, rgba(167, 139, 250, 0.35), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.service-medical .service-glow {
+  background: radial-gradient(circle at 50% 30%, rgba(96, 165, 250, 0.4), transparent 60%);
+}
+
+.service-grooming .service-glow {
+  background: radial-gradient(circle at 50% 30%, rgba(244, 114, 182, 0.4), transparent 60%);
+}
+
+.home-service-card:hover .service-glow {
+  opacity: 1;
+}
+
+.home-service-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.service-icon {
+  font-size: 72px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 8px 24px rgba(139, 92, 246, 0.4));
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.service-title {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 12px;
+  background: linear-gradient(135deg, #A78BFA, #F472B6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme="light"] .service-title {
+  background: linear-gradient(135deg, #7C3AED, #DB2777);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.service-desc {
+  font-size: 15px;
+  line-height: 1.7;
+  opacity: 0.85;
+  margin: 0 0 28px;
+  max-width: 340px;
+}
+
+.service-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+  transition: transform 0.2s;
+}
+
+.home-service-card:hover .service-cta {
+  transform: scale(1.05);
+}
+
+/* === UNIFIED GLASS SURFACES === */
+/* Apply glass to all major cards/panels */
+.stat-card,
+.order-card,
+.chart-card,
+.employee-card,
+.doctor-card,
+.visit-card,
+.panel,
+.card {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+[data-theme="light"] .stat-card,
+[data-theme="light"] .order-card,
+[data-theme="light"] .chart-card,
+[data-theme="light"] .employee-card,
+[data-theme="light"] .doctor-card,
+[data-theme="light"] .visit-card,
+[data-theme="light"] .panel,
+[data-theme="light"] .card {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 8px 28px rgba(139, 92, 246, 0.1) !important;
+}
+
+.stat-card:hover,
+.order-card:hover,
+.employee-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(167, 139, 250, 0.35) !important;
+  box-shadow: 0 20px 50px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* === UNIFIED FORMS === */
+.intake-form input,
+.intake-form select,
+.intake-form textarea,
+.form-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+select,
+textarea {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px !important;
+  padding: 14px 16px !important;
+  color: inherit;
+  font-family: inherit;
+  font-size: 15px;
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+
+[data-theme="light"] .intake-form input,
+[data-theme="light"] .intake-form select,
+[data-theme="light"] .intake-form textarea,
+[data-theme="light"] .form-input,
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="email"],
+[data-theme="light"] input[type="password"],
+[data-theme="light"] input[type="tel"],
+[data-theme="light"] input[type="number"],
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="datetime-local"],
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.intake-form input:focus,
+.intake-form select:focus,
+.intake-form textarea:focus,
+.form-input:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  border-color: #A78BFA !important;
+  box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.2) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  background: #fff !important;
+  border-color: #7C3AED !important;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15) !important;
+}
+
+/* === UNIFIED BUTTONS === */
+.btn-primary,
+button.btn-primary,
+.intake-submit,
+.login-submit,
+button[type="submit"] {
+  background: linear-gradient(135deg, #8B5CF6, #EC4899) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  padding: 14px 28px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.35) !important;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.btn-primary:hover:not(:disabled),
+button.btn-primary:hover:not(:disabled),
+.intake-submit:hover:not(:disabled),
+button[type="submit"]:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 40px rgba(139, 92, 246, 0.5) !important;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* === PAGE HEADERS UNIFIED === */
+.page-header,
+.intake-header,
+.dashboard-header,
+.operator-header,
+.employee-header {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+}
+
+[data-theme="light"] .page-header,
+[data-theme="light"] .intake-header,
+[data-theme="light"] .dashboard-header,
+[data-theme="light"] .operator-header,
+[data-theme="light"] .employee-header {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* === SYMPTOM CHIPS (intake) === */
+.symptom-chip {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.25s;
+}
+
+.symptom-chip:hover {
+  border-color: rgba(167, 139, 250, 0.4) !important;
+  background: rgba(167, 139, 250, 0.1) !important;
+}
+
+.symptom-chip.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(236, 72, 153, 0.3)) !important;
+  border-color: #A78BFA !important;
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
+}
+
+/* === QR CODE SUCCESS PAGE === */
+.intake-success {
+  max-width: 540px;
+  margin: 60px auto;
+  padding: 48px 32px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .intake-success {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.success-icon {
+  font-size: 72px;
+  margin-bottom: 16px;
+  animation: success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes success-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.qr-card {
+  display: inline-block;
+  padding: 20px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.3);
+  margin: 24px 0;
+}
+
+.qr-card canvas,
+.qr-card img {
+  display: block;
+  border-radius: 8px;
+}
+
+.qr-hint {
+  font-size: 14px;
+  opacity: 0.85;
+  line-height: 1.7;
+  margin: 16px 0 24px;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.btn-outline {
+  background: transparent !important;
+  color: inherit !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 12px 24px;
+  border-radius: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s;
+}
+
+[data-theme="light"] .btn-outline {
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+}
+
+.btn-outline:hover {
+  border-color: #A78BFA !important;
+  background: rgba(167, 139, 250, 0.1) !important;
+}
+
+/* === AUTOFILL INDICATOR === */
+.autofill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(34, 197, 94, 0.2));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10B981;
+  border-radius: 999px;
+  animation: fade-in 0.3s;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === PATIENT PROFILE PAGE === */
+.patient-profile {
+  max-width: 900px;
+  margin: 32px auto;
+  padding: 0 20px;
+}
+
+.patient-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 32px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.1));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  margin-bottom: 24px;
+}
+
+.patient-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  flex-shrink: 0;
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+}
+
+.patient-info h2 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.patient-info p {
+  margin: 2px 0;
+  opacity: 0.8;
+  font-size: 14px;
+}
+
+.visit-history-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 24px 0 12px;
+}
+
+.visit-history-item {
+  padding: 16px 20px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+}
+
+[data-theme="light"] .visit-history-item {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 640px) {
+  .home-services-grid {
+    grid-template-columns: 1fr;
+    margin: 24px auto;
+  }
+
+  .home-service-card {
+    padding: 36px 24px;
+  }
+
+  .service-icon {
+    font-size: 56px;
+  }
+
+  .service-title {
+    font-size: 22px;
+  }
+
+  .patient-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+}

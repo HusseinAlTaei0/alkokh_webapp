@@ -11,8 +11,8 @@
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- FOUC-prevention: apply theme before stylesheets load -->
   <script>
     (function () {
@@ -27,12 +27,14 @@
       }
     })();
   </script>
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <!-- Base styles (legacy + medical clinic) -->
+  <!-- Styles first (render-critical) -->
   <link rel="stylesheet" href="index.css">
-  <!-- New design system (tokens + components + view redesigns) -->
   <link rel="stylesheet" href="styles/index.css">
+  <!-- Core libs: Supabase needed early; others deferred -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <!-- QRCode is small (~8KB), load deferred -->
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@04f46c6/qrcode.min.js" defer></script>
+  <!-- Chart.js loaded on-demand by DashboardView (not here) -->
 </head>
 <body>
   <!-- Animated Background -->
@@ -87,18 +89,22 @@
         <span class="menu-number">01</span>
         <span class="menu-text">الصفحة الرئيسية</span>
       </a>
-      <a href="#booking/medical" class="menu-link" data-view="booking">
+      <a href="#employees" class="menu-link" data-view="employees">
         <span class="menu-number">02</span>
-        <span class="menu-text">زيارة طبيب</span>
+        <span class="menu-text">صفحة الموظفين</span>
+        <span class="menu-lock">🔒</span>
       </a>
-      <a href="#grooming" class="menu-link" data-view="grooming">
+      <a href="#operator" class="menu-link" data-view="operator">
         <span class="menu-number">03</span>
-        <span class="menu-text">الحلاقة والتحميم</span>
+        <span class="menu-text">المنظم</span>
+        <span class="menu-lock">🔒</span>
       </a>
-      <a href="#employee" class="menu-link" data-view="employee">
+      <a href="#reports" class="menu-link" data-view="reports">
         <span class="menu-number">04</span>
-        <span class="menu-text">صفحة الموظف</span>
+        <span class="menu-text">التقارير</span>
+        <span class="menu-lock">🔒</span>
       </a>
+      <!-- Hidden: Doctor & Admin links (shown only when authenticated as doctor/admin) -->
       <a href="#doctor" class="menu-link" data-view="doctor" data-role="doctor" style="display:none;">
         <span class="menu-number">05</span>
         <span class="menu-text">لوحة الطبيب 🩺</span>
@@ -115,16 +121,6 @@
         <span class="menu-number">08</span>
         <span class="menu-text">إدارة الأطباء 👨‍⚕️</span>
       </a>
-      <a href="#operator" class="menu-link" data-view="operator">
-        <span class="menu-number">09</span>
-        <span class="menu-text">المنظم</span>
-        <span class="menu-lock">🔒</span>
-      </a>
-      <a href="#dashboard" class="menu-link" data-view="dashboard">
-        <span class="menu-number">10</span>
-        <span class="menu-text">التقارير (حلاقة)</span>
-        <span class="menu-lock">🔒</span>
-      </a>
     </div>
   </div>
 
@@ -137,12 +133,12 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Sound for notifications -->
-  <audio id="notification-sound" preload="auto">
+  <audio id="notification-sound" preload="none">
     <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Jj4+LhoJ9eXd3eXyBhYmNj42KhoJ+fHp5eXyAhImNj46LhoJ9end4eHuAhImOj4+LiIN+fHt6fH+DhomMjIqHg398e3p7f4OHioyNjIiEgH58fH1/goaJi4yLiISAfn18fYCDh4qMjIuIhIB+fXx9gIOHiouMi4iEgH58fH2Ag4eKi4yLiISBf359fYCDh4mLi4qHg4B+fX19gIKGiYuLioeDgH5+fn+BhIeJiomHhIGAfn5+gIKFh4mJiIaCgH9+fn+BhIaIiYmHhIKAf35/gIKEhoeIh4WCgH9+f4CCg4WHh4aFg4GAfn5/gIGDhYaHhoSDgYB/f3+AgYOFhoeGhIOBgH9/f4CBg4WHhoWDgYB/f3+AgYOFhoaFg4GAf39/gIGDhYaGhYOBgH9/f4CBg4WHhoWDgYB/f4CAgYOFhoaFg4GAf39/gIGDhIaFhIOBgH9/gICBg4SEhYSDAICAgH+AgIGCg4SEBIKEAICAAIA=" type="audio/wav">
   </audio>
 
   <!-- Scripts: config first, then app logic -->
-  <script src="config.js"></script>
-  <script src="main.js"></script>
+  <script src="config.js" defer></script>
+  <script src="main.js" defer></script>
 </body>
 </html>
