@@ -1321,7 +1321,13 @@ const Router = {
     }
 
     // --- Auth gates ---
+    // Employees with PIN session trying to access admin pages → send to their own page
+    const _hasPinSession = !!sessionStorage.getItem('alkokh_employee');
     if (head === 'employees' || head === 'reports') {
+      if (_hasPinSession && !Auth.isAuthenticated()) {
+        window.location.hash = '#employee';
+        return;
+      }
       if (!Auth.isAuthenticated()) {
         this.currentView = 'login';
         LoginView.render($('#app'), head);
@@ -1329,9 +1335,7 @@ const Router = {
       }
     }
     if (head === 'operator' || head === 'dashboard') {
-      const savedEmployee = sessionStorage.getItem('alkokh_employee');
-      if (savedEmployee && !Auth.isAuthenticated()) {
-        showToast('⛔ هذه الصفحة للإدارة فقط', 'warning');
+      if (_hasPinSession && !Auth.isAuthenticated()) {
         window.location.hash = '#employee';
         return;
       }
@@ -1439,9 +1443,11 @@ const Router = {
 // ==========================================
 const LoginView = {
   _redirectTo: 'operator',
+  _activeTab: 'staff', // 'staff' | 'employee'
 
   render(container, redirectTo = 'operator') {
     this._redirectTo = redirectTo;
+    this._activeTab = 'staff';
 
     container.innerHTML = `
       <div class="login-container animate-in">
@@ -1451,16 +1457,24 @@ const LoginView = {
               <img src="assets/logo.svg" alt="الكوخ">
             </div>
             <h1>عيادة الكوخ البيطرية</h1>
-            <p>تسجيل دخول المدير</p>
+            <p>سجّل دخولك للوصول إلى لوحة التحكم</p>
           </div>
-          <div class="login-body">
+
+          <!-- Tab switcher -->
+          <div class="login-tabs">
+            <button class="login-tab active" data-tab="staff">🩺 طاقم طبي / مدير</button>
+            <button class="login-tab" data-tab="employee">✂️ موظفو الخدمات</button>
+          </div>
+
+          <!-- STAFF TAB: Email + Password -->
+          <div class="login-body" id="tab-staff">
             <div class="login-alert" id="login-error" style="display:none;">
               <span>❌</span>
               <span id="login-error-msg">البريد الإلكتروني أو كلمة المرور غير صحيحة</span>
             </div>
             <div class="form-group">
               <label class="form-label">البريد الإلكتروني</label>
-              <input type="email" class="form-input login-input" id="login-email" placeholder="admin@example.com" autocomplete="email" dir="ltr">
+              <input type="email" class="form-input login-input" id="login-email" placeholder="doctor@alkokh.com" autocomplete="email" dir="ltr">
             </div>
             <div class="form-group">
               <label class="form-label">كلمة المرور</label>
@@ -1476,9 +1490,25 @@ const LoginView = {
               </span>
             </button>
           </div>
+
+          <!-- EMPLOYEE TAB: PIN -->
+          <div class="login-body" id="tab-employee" style="display:none;">
+            <p class="pin-hint">أدخل رمز PIN الخاص بك (4 أرقام)</p>
+            <div class="pin-input-container">
+              <input type="password" class="pin-digit" id="pin-1" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+              <input type="password" class="pin-digit" id="pin-2" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+              <input type="password" class="pin-digit" id="pin-3" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+              <input type="password" class="pin-digit" id="pin-4" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+            </div>
+            <div class="pin-error" id="pin-error" style="display:none;">❌ رمز الدخول غير صحيح</div>
+            <button class="btn btn-primary btn-lg btn-block" id="pin-submit" style="margin-top:24px;">
+              <span id="pin-btn-text">🔓 دخول</span>
+              <span id="pin-btn-loading" style="display:none;"><span class="btn-spinner"></span> جاري التحقق...</span>
+            </button>
+          </div>
+
           <div class="login-footer">
-            <p>الدخول مقتصر على الإدارة فقط</p>
-            <a href="#booking" class="login-back-link">← العودة لصفحة الحجز</a>
+            <a href="#home" class="login-back-link">← العودة للرئيسية</a>
           </div>
         </div>
       </div>
@@ -1489,45 +1519,60 @@ const LoginView = {
   },
 
   _bindEvents(container) {
-    const form = container;
-    const submitBtn = form.querySelector('#login-submit');
-    const emailInput = form.querySelector('#login-email');
-    const passwordInput = form.querySelector('#login-password');
-    const togglePassword = form.querySelector('#toggle-password');
-    const errorDiv = form.querySelector('#login-error');
-    const errorMsg = form.querySelector('#login-error-msg');
-
-    // Toggle password visibility
-    togglePassword?.addEventListener('click', () => {
-      const type = passwordInput.type === 'password' ? 'text' : 'password';
-      passwordInput.type = type;
-      togglePassword.textContent = type === 'password' ? '👁️' : '🙈';
+    // --- Tab switching ---
+    container.querySelectorAll('.login-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const t = tab.dataset.tab;
+        this._activeTab = t;
+        container.querySelectorAll('.login-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+        container.querySelector('#tab-staff').style.display = t === 'staff' ? '' : 'none';
+        container.querySelector('#tab-employee').style.display = t === 'employee' ? '' : 'none';
+        if (t === 'employee') setTimeout(() => container.querySelector('#pin-1')?.focus(), 100);
+        else setTimeout(() => container.querySelector('#login-email')?.focus(), 100);
+      });
     });
 
-    // Submit handler
+    // --- Staff (email+password) login ---
+    const submitBtn = container.querySelector('#login-submit');
+    const emailInput = container.querySelector('#login-email');
+    const passwordInput = container.querySelector('#login-password');
+    const errorDiv = container.querySelector('#login-error');
+    const errorMsg = container.querySelector('#login-error-msg');
+
+    container.querySelector('#toggle-password')?.addEventListener('click', () => {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+      container.querySelector('#toggle-password').textContent = type === 'password' ? '👁️' : '🙈';
+    });
+
     const handleLogin = async () => {
       const email = emailInput.value.trim();
       const password = passwordInput.value;
-
       if (!email || !password) {
         errorDiv.style.display = 'flex';
         errorMsg.textContent = 'الرجاء إدخال البريد الإلكتروني وكلمة المرور';
         return;
       }
-
-      // Show loading
-      form.querySelector('#login-btn-text').style.display = 'none';
-      form.querySelector('#login-btn-loading').style.display = 'inline-flex';
+      container.querySelector('#login-btn-text').style.display = 'none';
+      container.querySelector('#login-btn-loading').style.display = 'inline-flex';
       submitBtn.disabled = true;
       errorDiv.style.display = 'none';
-
       try {
         await Auth.login(email, password);
         showToast('تم تسجيل الدخول بنجاح! مرحباً بك 👋', 'success');
         playNotificationSound();
-        // Navigate directly instead of hash change (hash may already be set)
-        window.location.hash = '#' + this._redirectTo;
-        await Router.navigate(this._redirectTo);
+        // Routing: admins see requested page, doctors see their dashboard
+        if (Auth.isClinicAdmin()) {
+          window.location.hash = '#' + this._redirectTo;
+          await Router.navigate(this._redirectTo);
+        } else if (Auth.isDoctor()) {
+          window.location.hash = '#doctor';
+          await Router.navigate('doctor');
+        } else {
+          errorDiv.style.display = 'flex';
+          errorMsg.textContent = '⛔ هذا الحساب لا يملك صلاحية الدخول';
+          await Auth.logout();
+        }
       } catch (err) {
         console.error('Login error:', err);
         errorDiv.style.display = 'flex';
@@ -1535,21 +1580,66 @@ const LoginView = {
           ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
           : 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
       } finally {
-        form.querySelector('#login-btn-text').style.display = 'inline';
-        form.querySelector('#login-btn-loading').style.display = 'none';
+        container.querySelector('#login-btn-text').style.display = 'inline';
+        container.querySelector('#login-btn-loading').style.display = 'none';
         submitBtn.disabled = false;
       }
     };
 
     submitBtn?.addEventListener('click', handleLogin);
+    passwordInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+    emailInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') passwordInput?.focus(); });
 
-    // Enter key to submit
-    passwordInput?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleLogin();
+    // --- Employee (PIN) login ---
+    const digits = [1, 2, 3, 4].map(i => container.querySelector(`#pin-${i}`));
+    const pinError = container.querySelector('#pin-error');
+    const pinSubmit = container.querySelector('#pin-submit');
+
+    digits.forEach((input, idx) => {
+      input.addEventListener('input', () => {
+        input.value = input.value.replace(/[^0-9]/g, '');
+        if (input.value && idx < 3) digits[idx + 1].focus();
+        pinError.style.display = 'none';
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && idx > 0) {
+          digits[idx - 1].focus();
+          digits[idx - 1].value = '';
+        }
+        if (e.key === 'Enter') handlePinSubmit();
+      });
+      input.addEventListener('focus', () => input.select());
     });
-    emailInput?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') passwordInput?.focus();
-    });
+
+    const handlePinSubmit = async () => {
+      const pin = digits.map(d => d.value).join('');
+      if (pin.length !== 4) {
+        pinError.textContent = '⚠️ الرجاء إدخال 4 أرقام';
+        pinError.style.display = 'block';
+        return;
+      }
+      pinSubmit.disabled = true;
+      container.querySelector('#pin-btn-text').style.display = 'none';
+      container.querySelector('#pin-btn-loading').style.display = 'inline-flex';
+      const employee = await DB.employeeLogin(pin);
+      if (employee) {
+        sessionStorage.setItem('alkokh_employee', JSON.stringify(employee));
+        showToast(`مرحباً ${employee.name_ar}! 👋`, 'success');
+        playNotificationSound();
+        window.location.hash = '#employee';
+        await Router.navigate('employee');
+      } else {
+        pinError.textContent = '❌ رمز الدخول غير صحيح';
+        pinError.style.display = 'block';
+        digits.forEach(d => { d.value = ''; });
+        digits[0].focus();
+        pinSubmit.disabled = false;
+        container.querySelector('#pin-btn-text').style.display = 'inline';
+        container.querySelector('#pin-btn-loading').style.display = 'none';
+      }
+    };
+
+    pinSubmit?.addEventListener('click', handlePinSubmit);
   }
 };
 
@@ -4522,16 +4612,8 @@ const EmployeesManagementView = {
       return;
     }
     if (!Auth.isClinicAdmin()) {
-      container.innerHTML = `
-        <div class="page-header animate-in">
-          <h1>👥 صفحة الموظفين</h1>
-        </div>
-        <div class="empty-state panel">
-          <p>لا توجد صلاحيات لعرض هذه الصفحة.</p>
-          <p>يرجى تسجيل الدخول بحساب طبيب أو مدير.</p>
-          <a href="#home" class="btn btn-primary" style="margin-top:16px;">العودة للرئيسية</a>
-        </div>
-      `;
+      // Redirect to login panel to allow proper authentication
+      LoginView.render(container, 'employees');
       return;
     }
 

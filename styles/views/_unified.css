@@ -594,6 +594,63 @@ button[type="submit"]:hover:not(:disabled) {
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+/* === LOGIN TABS === */
+.login-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  margin: 0 0 20px;
+}
+
+[data-theme="light"] .login-tabs {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.login-tab {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+[data-theme="light"] .login-tab {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.login-tab.active {
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);
+}
+
+.login-tab:not(.active):hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="light"] .login-tab:not(.active):hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.pin-hint {
+  text-align: center;
+  opacity: 0.7;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 640px) {
   .home-services-grid {
